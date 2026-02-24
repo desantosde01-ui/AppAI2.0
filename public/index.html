@@ -180,6 +180,7 @@
   // LIVE PREVIEW
   let previewTimeout;
   codeEditor.addEventListener('input', () => { clearTimeout(previewTimeout); previewTimeout = setTimeout(updatePreview, 300); });
+  codeEditor.addEventListener('paste', () => { clearTimeout(previewTimeout); previewTimeout = setTimeout(updatePreview, 400); });
 
   function updatePreview() {
     const code = codeEditor.value.trim();
@@ -316,9 +317,10 @@
     convertBtn.disabled = true;
     convertBtn.textContent = '⟳ Convertendo...';
     const loadingMsg = addMessage('⚡ Convertendo React → HTML puro com Three.js...', 'ai loading');
+    const threeCDN = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
     const prompt = `Converta este código React/TSX para um único arquivo HTML puro que funcione no navegador sem build.
 Regras obrigatórias:
-- Use Three.js via CDN se necessário: <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+- Use Three.js via CDN se necessário: ${threeCDN}
 - Todo CSS e JS inline no HTML
 - Sem imports, sem require, sem JSX
 - Mantenha shaders GLSL exatamente iguais
