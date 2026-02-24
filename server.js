@@ -17,7 +17,7 @@ app.post('/api/chat', async (req, res) => {
   if (!prompt) return res.status(400).json({ error: 'Prompt é obrigatório' });
 
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/api/v1/chat/completions', {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
