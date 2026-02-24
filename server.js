@@ -17,7 +17,7 @@ app.post('/api/chat', async (req, res) => {
   if (!prompt) return res.status(400).json({ error: 'Prompt é obrigatório' });
 
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const response = await fetch('https://openrouter.ai/api/v1/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -25,7 +25,17 @@ app.post('/api/chat', async (req, res) => {
       },
       body: JSON.stringify({
         model: 'google/gemini-2.0-flash-001',
-        messages: [{ role: 'user', content: prompt }]
+        messages: [
+          {
+            role: 'system',
+            content: `Você é um especialista sênior em HTML, CSS e JavaScript.
+Quando pedido para criar efeitos visuais, animações ou transições,
+você SEMPRE implementa usando CSS puro com técnicas avançadas como
+::before, ::after, transitions, transforms, keyframes e gradients.
+Retorne APENAS o código HTML completo, sem explicações, sem markdown, sem blocos de código.`
+          },
+          { role: 'user', content: prompt }
+        ]
       })
     });
 
