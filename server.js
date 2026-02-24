@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-async function callClaude(messages, maxTokens = 4096) {
+async function callClaude(messages, maxTokens = 8192) {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
