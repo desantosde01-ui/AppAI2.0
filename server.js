@@ -7,12 +7,40 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-async function callClaude(messages, maxTokens = 8192) {
+// Código via OpenRouter (Claude)
+async function callOpenRouter(prompt) {
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${OPENROUTER_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: 'anthropic/claude-sonnet-4-5',
+      max_tokens: 8192,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error?.message || 'Erro na API OpenRouter');
+  }
+
+  const data = await response.json();
+  let result = data.choices[0].message.content.trim();
+  result = result.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim();
+  return result;
+}
+
+// Imagem via Anthropic direto (Claude Vision)
+async function callAnthropicVision(image, mediaType, prompt) {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -22,14 +50,20 @@ async function callClaude(messages, maxTokens = 8192) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: maxTokens,
-      messages
+      max_tokens: 8192,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType || 'image/png', data: image } },
+          { type: 'text', text: prompt }
+        ]
+      }]
     })
   });
 
   if (!response.ok) {
     const err = await response.json();
-    throw new Error(err.error?.message || 'Erro na API do Claude');
+    throw new Error(err.error?.message || 'Erro na API Anthropic');
   }
 
   const data = await response.json();
@@ -38,6 +72,7 @@ async function callClaude(messages, maxTokens = 8192) {
   return result;
 }
 
+// Rota para modificar/converter código (OpenRouter → Claude)
 app.post('/api/chat', async (req, res) => {
   const { prompt, code } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt é obrigatório' });
@@ -61,11 +96,11 @@ Regras:
 - Mantenha o visual e comportamento idênticos ao original
 - Retorne APENAS o HTML completo, sem explicações, sem markdown`
     : `Você é um especialista sênior em HTML, CSS e JavaScript com foco em UI de alta qualidade.
-Quando modificar código, mantenha o estilo visual e melhore com CSS avançado.
+Quando modificar código, mantenha o estilo visual e melhore com CSS avançado: ::before, ::after, transitions, transforms, keyframes, gradients.
 Retorne APENAS o código HTML completo, sem explicações, sem markdown.`;
 
   try {
-    const result = await callClaude([{ role: 'user', content: `${systemPrompt}\n\n${prompt}` }]);
+    const result = await callOpenRouter(`${systemPrompt}\n\n${prompt}`);
     res.json({ result });
   } catch (err) {
     console.error('Erro chat:', err.message);
@@ -73,21 +108,17 @@ Retorne APENAS o código HTML completo, sem explicações, sem markdown.`;
   }
 });
 
+// Rota para analisar imagem (Anthropic direto → Claude Vision)
 app.post('/api/image', async (req, res) => {
   const { image, mediaType, prompt } = req.body;
   if (!image) return res.status(400).json({ error: 'Imagem é obrigatória' });
   if (!ANTHROPIC_API_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY não configurada' });
 
-  const userPrompt = prompt || 'Analise este componente/design com atenção a cada detalhe e gere um arquivo HTML completo e funcional que replique exatamente o que você vê. Use CSS moderno, animações se houver, e JavaScript se necessário. Seja fiel às cores, espaçamentos, tipografia e efeitos visuais. Retorne APENAS o código HTML completo, sem explicações, sem markdown.';
+  const userPrompt = prompt ||
+    'Analise este componente/design com atenção a cada detalhe e gere um arquivo HTML completo e funcional que replique exatamente o que você vê. Use CSS moderno, animações se houver, e JavaScript se necessário. Seja fiel às cores, espaçamentos, tipografia e efeitos visuais. Retorne APENAS o código HTML completo, sem explicações, sem markdown.';
 
   try {
-    const result = await callClaude([{
-      role: 'user',
-      content: [
-        { type: 'image', source: { type: 'base64', media_type: mediaType || 'image/png', data: image } },
-        { type: 'text', text: userPrompt }
-      ]
-    }]);
+    const result = await callAnthropicVision(image, mediaType, userPrompt);
     res.json({ result });
   } catch (err) {
     console.error('Erro imagem:', err.message);
