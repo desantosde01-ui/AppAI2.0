@@ -15,12 +15,17 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Sanitize code from Claude ───────────────────────────────────────────────
 function sanitizeCode(code) {
-  code = code.replace(/^```tsx?\n?/i, '').replace(/\n?```$/i, '').trim();
-  code = code.replace(/[\u201C\u201D]/g, '"');   // curly double quotes -> straight
-  code = code.replace(/[\u2018\u2019]/g, "'");   // curly single quotes -> straight
-  code = code.replace(/[\u2013\u2014]/g, '-');   // em/en dash -> hyphen
-  code = code.replace(/[\u00A0]/g, ' ');         // non-breaking space -> space
-  if (!code.endsWith('\n')) code += '\n';
+  // Remove ANY markdown code fence (typescript, tsx, jsx, js, etc)
+  code = code.replace(/^```[a-zA-Z]*
+?/, '').replace(/
+?```$/, '').trim();
+  code = code.replace(/[“”]/g, '"');
+  code = code.replace(/[‘’]/g, "'");
+  code = code.replace(/[–—]/g, '-');
+  code = code.replace(/[ ]/g, ' ');
+  if (!code.endsWith('
+')) code += '
+';
   return code;
 }
 
