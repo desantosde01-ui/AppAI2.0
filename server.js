@@ -13,7 +13,18 @@ app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ─── Base files do projeto React + Vite + Tailwind ───────────────────────────
+// ─── Sanitize code from Claude ───────────────────────────────────────────────
+function sanitizeCode(code) {
+  code = code.replace(/^```tsx?\n?/i, '').replace(/\n?```$/i, '').trim();
+  code = code.replace(/[\u201C\u201D]/g, '"');   // curly double quotes -> straight
+  code = code.replace(/[\u2018\u2019]/g, "'");   // curly single quotes -> straight
+  code = code.replace(/[\u2013\u2014]/g, '-');   // em/en dash -> hyphen
+  code = code.replace(/[\u00A0]/g, ' ');         // non-breaking space -> space
+  if (!code.endsWith('\n')) code += '\n';
+  return code;
+}
+
+// ─── Base files ───────────────────────────────────────────────────────────────
 function getBaseFiles(appCode) {
   return {
     'package.json': JSON.stringify({
@@ -33,8 +44,7 @@ function getBaseFiles(appCode) {
         lib: ['ES2020', 'DOM', 'DOM.Iterable'], module: 'ESNext',
         skipLibCheck: true, moduleResolution: 'bundler',
         allowImportingTsExtensions: true, resolveJsonModule: true,
-        isolatedModules: true, noEmit: true, jsx: 'react-jsx',
-        strict: false
+        isolatedModules: true, noEmit: true, jsx: 'react-jsx', strict: false
       },
       include: ['src']
     }, null, 2),
@@ -44,33 +54,37 @@ function getBaseFiles(appCode) {
     }, null, 2),
     'postcss.config.js': `export default { plugins: { tailwindcss: {}, autoprefixer: {} } }`,
     'tailwind.config.js': `/** @type {import('tailwindcss').Config} */\nexport default {\n  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],\n  theme: { extend: {} },\n  plugins: [],\n}`,
-    'index.html': `<!DOCTYPE html>\n<html lang="pt-BR">\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <title>CodeAI App</title>\n  </head>\n  <body>\n    <div id="root"></div>\n    <script type="module" src="/src/main.tsx"></script>\n  </body>\n</html>`,
+    'index.html': `<!DOCTYPE html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <title>CodeAI App</title>\n  </head>\n  <body>\n    <div id="root"></div>\n    <script type="module" src="/src/main.tsx"></script>\n  </body>\n</html>`,
     'src/main.tsx': `import React from 'react'\nimport ReactDOM from 'react-dom/client'\nimport App from './App'\nimport './index.css'\n\nReactDOM.createRoot(document.getElementById('root')!).render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>,\n)`,
     'src/index.css': `@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n* { box-sizing: border-box; }\nbody { margin: 0; }`,
     'src/App.tsx': appCode
   };
 }
 
-// ─── Prompt para gerar apenas App.tsx ────────────────────────────────────────
-function getPrompt(userRequest, currentAppCode) {
+// ─── Build prompt ─────────────────────────────────────────────────────────────
+function buildPrompt(userRequest, currentAppCode) {
   const isModify = !!currentAppCode;
-  return `Você é um especialista em React, TypeScript e Tailwind CSS que cria interfaces de altíssima qualidade visual.
+  const base = `You are a senior React + TypeScript + Tailwind CSS expert. Create stunning, professional UI.
 
-${isModify ? `MODIFIQUE o componente abaixo conforme o pedido:\n\`\`\`tsx\n${currentAppCode}\n\`\`\`\n\nPedido: ${userRequest}` : `Crie um componente React para: ${userRequest}`}
+STRICT RULES:
+- Return ONLY raw TSX code, no markdown, no code fences, no explanations
+- Start directly with: import React from 'react'
+- Export: export default function App()
+- Use Tailwind CSS only, no inline styles
+- Use lucide-react for icons (already installed)
+- NO external imports besides react and lucide-react
+- Use only standard ASCII characters in all strings and JSX content
+- Every string must be properly terminated with matching quotes
+- Every JSX tag must be properly closed`;
 
-REGRAS OBRIGATÓRIAS:
-- Retorne APENAS o código TSX do App.tsx, sem explicações, sem markdown, sem blocos de código
-- Use Tailwind CSS para todos os estilos
-- Use lucide-react para ícones se necessário (já instalado)
-- O componente deve ser export default function App()
-- Design moderno, profissional e visualmente impressionante
-- Responsivo por padrão
-- Sem imports externos além de react e lucide-react
-- Comece direto com: import React from 'react'`;
+  if (isModify) {
+    return `${base}\n\nCurrent code to modify:\n${currentAppCode}\n\nModification requested: ${userRequest}\n\nReturn the complete modified App.tsx:`;
+  }
+  return `${base}\n\nCreate a complete, visually impressive React app for: ${userRequest}\n\nReturn only the App.tsx code:`;
 }
 
-// ─── Chamar Claude via OpenRouter ────────────────────────────────────────────
-async function callOpenRouter(prompt, maxTokens = 16000) {
+// ─── OpenRouter call ──────────────────────────────────────────────────────────
+async function callOpenRouter(prompt) {
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -79,7 +93,7 @@ async function callOpenRouter(prompt, maxTokens = 16000) {
     },
     body: JSON.stringify({
       model: 'anthropic/claude-sonnet-4-5',
-      max_tokens: maxTokens,
+      max_tokens: 16000,
       messages: [{ role: 'user', content: prompt }]
     })
   });
@@ -90,14 +104,11 @@ async function callOpenRouter(prompt, maxTokens = 16000) {
   }
 
   const data = await response.json();
-  let result = data.choices[0].message.content.trim();
-  // Remove any markdown code blocks if present
-  result = result.replace(/^```tsx?\n?/i, '').replace(/\n?```$/i, '').trim();
-  return result;
+  return sanitizeCode(data.choices[0].message.content);
 }
 
-// ─── Chamar Claude Vision via Anthropic ──────────────────────────────────────
-async function callAnthropicVision(image, mediaType, prompt, maxTokens = 16000) {
+// ─── Anthropic Vision call ────────────────────────────────────────────────────
+async function callAnthropicVision(image, mediaType, prompt) {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -107,7 +118,7 @@ async function callAnthropicVision(image, mediaType, prompt, maxTokens = 16000) 
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: maxTokens,
+      max_tokens: 16000,
       messages: [{
         role: 'user',
         content: [
@@ -124,70 +135,69 @@ async function callAnthropicVision(image, mediaType, prompt, maxTokens = 16000) 
   }
 
   const data = await response.json();
-  let result = data.content[0].text.trim();
-  result = result.replace(/^```tsx?\n?/i, '').replace(/\n?```$/i, '').trim();
-  return result;
+  return sanitizeCode(data.content[0].text);
 }
 
-// ─── ROTA: Gerar/modificar projeto React ─────────────────────────────────────
+// ─── ROUTES ───────────────────────────────────────────────────────────────────
+
+// Generate / modify React project
 app.post('/api/generate', async (req, res) => {
   const { prompt, currentAppCode } = req.body;
-  if (!prompt) return res.status(400).json({ error: 'Prompt obrigatório' });
+  if (!prompt) return res.status(400).json({ error: 'Prompt required' });
 
   try {
-    const fullPrompt = getPrompt(prompt, currentAppCode);
-    const appCode = await callOpenRouter(fullPrompt);
+    const appCode = await callOpenRouter(buildPrompt(prompt, currentAppCode));
     const files = getBaseFiles(appCode);
     res.json({ files, appCode });
   } catch (err) {
-    console.error('Erro /api/generate:', err.message);
+    console.error('/api/generate error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ─── ROTA: Imagem → projeto React ────────────────────────────────────────────
+// Image -> React project
 app.post('/api/image', async (req, res) => {
   const { image, mediaType, prompt } = req.body;
-  if (!image) return res.status(400).json({ error: 'Imagem obrigatória' });
+  if (!image) return res.status(400).json({ error: 'Image required' });
 
-  const visionPrompt = `Você é um especialista em React, TypeScript e Tailwind CSS.
+  const visionPrompt = `You are a senior React + TypeScript + Tailwind CSS expert.
 
-Analise este design/screenshot e recrie como um componente React.
+Analyze this design/screenshot and recreate it as a React component.
+${prompt ? `Additional instructions: ${prompt}` : ''}
 
-${prompt ? `Instruções adicionais: ${prompt}` : ''}
-
-REGRAS OBRIGATÓRIAS:
-- Retorne APENAS o código TSX, sem explicações, sem markdown
-- Use Tailwind CSS para todos os estilos
-- Use lucide-react para ícones se necessário
-- Export default function App()
-- Seja fiel às cores, layout e estilo visual da imagem
-- Comece direto com: import React from 'react'`;
+STRICT RULES:
+- Return ONLY raw TSX code, no markdown, no explanations
+- Start with: import React from 'react'
+- Export: export default function App()
+- Use Tailwind CSS only
+- Use lucide-react for icons if needed
+- Use only ASCII characters in strings
+- Be faithful to the colors, layout and visual style of the image`;
 
   try {
     const appCode = await callAnthropicVision(image, mediaType || 'image/png', visionPrompt);
     const files = getBaseFiles(appCode);
     res.json({ files, appCode });
   } catch (err) {
-    console.error('Erro /api/image:', err.message);
+    console.error('/api/image error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ─── ROTA: Chat HTML simples ──────────────────────────────────────────────────
+// Simple HTML chat (legacy)
 app.post('/api/chat', async (req, res) => {
   const { prompt, code } = req.body;
-  if (!prompt) return res.status(400).json({ error: 'Prompt obrigatório' });
+  if (!prompt) return res.status(400).json({ error: 'Prompt required' });
 
-  const fullPrompt = `Você é especialista em HTML, CSS e JavaScript. Retorne APENAS o HTML completo, sem explicações, sem markdown.\n\n${code ? `Código atual:\n${code}\n\nPedido: ${prompt}` : prompt}`;
+  const fullPrompt = `You are an HTML/CSS/JS expert. Return ONLY complete HTML, no markdown.\n\n${code ? `Current code:\n${code}\n\nRequest: ${prompt}` : prompt}`;
 
   try {
-    const result = await callOpenRouter(fullPrompt);
-    res.json({ result: result.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim() });
+    const raw = await callOpenRouter(fullPrompt);
+    res.json({ result: raw.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim() });
   } catch (err) {
-    console.error('Erro /api/chat:', err.message);
+    console.error('/api/chat error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-app.listen(PORT, () => console.log(`✅ CodeAI rodando na porta ${PORT}`));
+app.listen(PORT, () => console.log(`CodeAI running on port ${PORT}`));
