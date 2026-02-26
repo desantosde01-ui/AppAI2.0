@@ -328,16 +328,16 @@
         });
         if (!response.ok) { const e = await response.json(); throw new Error(e.error); }
         const data = await response.json();
-        files = data.files;
+        files = data.files; currentProject = data;
       } else {
         const response = await fetch('/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: userMsg, currentFiles: currentProject })
+          body: JSON.stringify({ prompt: userMsg, currentAppCode: currentProject?.appCode })
         });
         if (!response.ok) { const e = await response.json(); throw new Error(e.error); }
         const data = await response.json();
-        files = data.files;
+        files = data.files; currentProject = data;
       }
 
       loadingText.textContent = 'Iniciando StackBlitz...';
