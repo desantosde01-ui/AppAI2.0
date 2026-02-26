@@ -5,103 +5,93 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CodeAI</title>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/@stackblitz/sdk/bundles/sdk.umd.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --bg: #0f0f0f; --surface: #1a1a1a; --surface2: #222;
-      --border: #2a2a2a; --accent: #4f46e5; --accent2: #7c3aed;
-      --text: #f0f0f0; --text-muted: #666; --green: #22c55e;
-      --mono: 'JetBrains Mono', monospace; --sans: 'Inter', sans-serif;
+      --border: #2a2a2a; --accent: #4f46e5; --text: #f0f0f0;
+      --text-muted: #666; --green: #22c55e;
+      --sans: 'Inter', sans-serif; --mono: 'JetBrains Mono', monospace;
     }
     body { background: var(--bg); color: var(--text); font-family: var(--sans); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
     /* HEADER */
-    header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 16px; height: 48px; border-bottom: 1px solid var(--border);
-      background: var(--surface); flex-shrink: 0;
-    }
+    header { display: flex; align-items: center; justify-content: space-between; padding: 0 16px; height: 48px; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
     .logo { font-size: 15px; font-weight: 700; background: linear-gradient(90deg, #6366f1, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .header-right { display: flex; align-items: center; gap: 8px; }
-    .badge { border-radius: 6px; padding: 3px 8px; font-size: 11px; font-family: var(--mono); color: #fff; font-weight: 600; }
-    .claude-badge { background: linear-gradient(135deg, #cc785c, #e8956d); }
+    .badge { border-radius: 6px; padding: 3px 8px; font-size: 11px; font-family: var(--mono); color: #fff; font-weight: 600; background: linear-gradient(135deg, #cc785c, #e8956d); }
     .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); }
 
-    /* LAYOUT */
+    /* WORKSPACE */
     .workspace { display: flex; flex: 1; overflow: hidden; }
 
-    /* LEFT — CHAT */
-    .chat-panel {
-      width: 320px; flex-shrink: 0; display: flex; flex-direction: column;
-      border-right: 1px solid var(--border); background: var(--surface);
-    }
-    .chat-header { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
-    .chat-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+    /* LEFT CHAT */
+    .chat-panel { width: 300px; flex-shrink: 0; display: flex; flex-direction: column; border-right: 1px solid var(--border); background: var(--surface); }
+    .chat-header { padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+    .chat-messages { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
     .chat-messages::-webkit-scrollbar { width: 3px; }
     .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-    .msg { font-size: 13px; line-height: 1.55; padding: 10px 13px; border-radius: 12px; max-width: 100%; word-break: break-word; }
-    .msg.user { background: var(--accent); color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; max-width: 85%; }
-    .msg.ai { background: var(--surface2); color: var(--text); align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid var(--border); }
+    .msg { font-size: 13px; line-height: 1.55; padding: 9px 12px; border-radius: 12px; word-break: break-word; }
+    .msg.user { background: var(--accent); color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; max-width: 88%; }
+    .msg.ai { background: var(--surface2); color: var(--text); align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid var(--border); max-width: 100%; }
     .msg.ai.loading { color: var(--text-muted); font-style: italic; }
-    .msg.thinking { background: #1a1a2e; border-color: #4f46e5; color: #818cf8; font-size: 12px; font-style: italic; }
+    .msg.thinking { background: #1a1a2e; border-color: #4f46e5; color: #818cf8; font-size: 12px; }
 
-    /* Image preview in chat */
-    .img-preview-row { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--surface2); border-top: 1px solid var(--border); flex-shrink: 0; }
+    .suggestions { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 10px; border-top: 1px solid var(--border); }
+    .suggestion-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 10px; font-size: 11px; color: var(--text-muted); cursor: pointer; transition: all 0.2s; white-space: nowrap; font-family: var(--sans); }
+    .suggestion-btn:hover { border-color: var(--accent); color: var(--text); }
+
+    .img-preview-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--surface2); border-top: 1px solid var(--border); flex-shrink: 0; }
     .img-preview-row.hidden { display: none; }
-    .img-preview-thumb { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
+    .img-preview-thumb { width: 34px; height: 34px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
     .img-preview-name { font-size: 11px; color: var(--text-muted); font-family: var(--mono); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .img-preview-remove { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; padding: 2px 6px; }
 
-    /* Suggested actions */
-    .suggestions { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--border); }
-    .suggestion-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 5px 12px; font-size: 11px; color: var(--text-muted); cursor: pointer; transition: all 0.2s; white-space: nowrap; font-family: var(--sans); }
-    .suggestion-btn:hover { border-color: var(--accent); color: var(--text); }
-
-    .chat-input-row { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); background: var(--surface); align-items: flex-end; }
-    .chat-input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; font-family: var(--sans); font-size: 13px; color: var(--text); outline: none; transition: border-color 0.2s; min-width: 0; resize: none; max-height: 100px; line-height: 1.4; }
+    .chat-input-row { display: flex; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--border); background: var(--surface); align-items: flex-end; }
+    .chat-input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; font-family: var(--sans); font-size: 13px; color: var(--text); outline: none; transition: border-color 0.2s; resize: none; max-height: 120px; line-height: 1.4; }
     .chat-input:focus { border-color: var(--accent); }
     .chat-input::placeholder { color: var(--text-muted); }
-    .img-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; color: var(--text-muted); font-size: 15px; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
+    .img-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; color: var(--text-muted); font-size: 14px; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
     .img-btn:hover { border-color: #cc785c; color: #cc785c; }
-    .send-btn { background: var(--accent); border: none; border-radius: 8px; padding: 9px 14px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; flex-shrink: 0; }
+    .send-btn { background: var(--accent); border: none; border-radius: 8px; padding: 9px 14px; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; flex-shrink: 0; }
     .send-btn:hover { opacity: 0.85; }
     .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     #imageInput { display: none; }
 
-    /* RIGHT — PREVIEW + CODE */
+    /* RIGHT PANEL */
     .right-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-
-    .right-topbar {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 16px; height: 44px; border-bottom: 1px solid var(--border);
-      background: var(--surface); flex-shrink: 0; gap: 8px;
-    }
+    .right-topbar { display: flex; align-items: center; justify-content: space-between; padding: 0 14px; height: 44px; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
     .view-tabs { display: flex; gap: 2px; background: var(--bg); border-radius: 8px; padding: 3px; }
-    .view-tab { padding: 5px 14px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: none; background: none; color: var(--text-muted); transition: all 0.2s; font-family: var(--sans); }
+    .view-tab { padding: 4px 14px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: none; background: none; color: var(--text-muted); transition: all 0.2s; font-family: var(--sans); }
     .view-tab.active { background: var(--surface2); color: var(--text); }
     .topbar-right { display: flex; align-items: center; gap: 8px; }
-    .topbar-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 5px 12px; font-size: 12px; color: var(--text-muted); cursor: pointer; transition: all 0.2s; font-family: var(--sans); }
+    .topbar-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 4px 12px; font-size: 12px; color: var(--text-muted); cursor: pointer; transition: all 0.2s; font-family: var(--sans); }
     .topbar-btn:hover { border-color: var(--accent); color: var(--text); }
-    .topbar-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
     .status-bar { font-size: 11px; font-family: var(--mono); color: var(--text-muted); }
 
-    /* PREVIEW */
-    .preview-area { flex: 1; position: relative; overflow: hidden; }
-    .preview-frame { width: 100%; height: 100%; border: none; background: #fff; display: none; }
-    .preview-empty { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--text-muted); }
-    .preview-empty-icon { font-size: 48px; opacity: 0.2; }
-    .preview-empty h3 { font-size: 16px; font-weight: 600; color: var(--text-muted); }
-    .preview-empty p { font-size: 13px; opacity: 0.6; text-align: center; max-width: 280px; line-height: 1.5; }
+    /* STACKBLITZ EMBED */
+    .stackblitz-area { flex: 1; position: relative; overflow: hidden; display: none; }
+    .stackblitz-area.active { display: block; }
+    #stackblitzEmbed { width: 100%; height: 100%; border: none; }
 
-    /* CODE VIEW */
-    .code-area { flex: 1; display: none; flex-direction: column; overflow: hidden; }
-    .code-area.active { display: flex; }
-    .code-editor { flex: 1; background: var(--bg); border: none; outline: none; resize: none; font-family: var(--mono); font-size: 12px; line-height: 1.7; color: #c8c8e8; padding: 16px; overflow-y: auto; }
+    /* EMPTY STATE */
+    .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--text-muted); }
+    .empty-state.hidden { display: none; }
+    .empty-icon { font-size: 48px; opacity: 0.15; }
+    .empty-state h3 { font-size: 16px; font-weight: 600; }
+    .empty-state p { font-size: 13px; opacity: 0.6; text-align: center; max-width: 280px; line-height: 1.5; }
 
     /* DROP OVERLAY */
     .drop-overlay { display: none; position: fixed; inset: 0; background: rgba(79,70,229,0.12); border: 3px dashed var(--accent); z-index: 100; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; color: var(--accent); pointer-events: none; }
     .drop-overlay.active { display: flex; }
+
+    /* LOADING OVERLAY */
+    .loading-overlay { display: none; position: absolute; inset: 0; background: rgba(15,15,15,0.92); z-index: 50; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+    .loading-overlay.active { display: flex; }
+    .loading-spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-size: 13px; color: var(--text-muted); font-family: var(--mono); }
   </style>
 </head>
 <body>
@@ -111,42 +101,42 @@
 <header>
   <div class="logo">✦ CodeAI</div>
   <div class="header-right">
-    <div class="badge claude-badge">Claude Sonnet</div>
+    <div class="badge">Claude + StackBlitz</div>
     <div class="status-dot"></div>
   </div>
 </header>
 
 <div class="workspace">
 
-  <!-- LEFT: CHAT -->
+  <!-- CHAT -->
   <div class="chat-panel">
     <div class="chat-header">Chat</div>
     <div class="chat-messages" id="chatMessages">
-      <div class="msg ai">👋 Olá! Me descreva o que você quer criar ou cole um código para modificar. Posso criar sites, componentes, animações do zero!</div>
+      <div class="msg ai">👋 Olá! Descreva o que quer criar e eu gero um projeto React completo com Vite + Tailwind rodando ao vivo!</div>
     </div>
 
-    <div class="suggestions" id="suggestions">
-      <button class="suggestion-btn" onclick="useSuggestion('Crie uma landing page moderna para uma hamburgueria')">🍔 Landing page</button>
-      <button class="suggestion-btn" onclick="useSuggestion('Crie um dashboard com gráficos e cards de métricas')">📊 Dashboard</button>
-      <button class="suggestion-btn" onclick="useSuggestion('Crie um componente de card com efeito glassmorphism')">✨ Card glass</button>
-      <button class="suggestion-btn" onclick="useSuggestion('Crie uma animação de partículas interativa com Three.js')">🌌 Partículas 3D</button>
+    <div class="suggestions">
+      <button class="suggestion-btn" onclick="useSuggestion('Crie uma landing page para uma cafeteria chamada Noir Café, tema escuro e elegante')">☕ Cafeteria</button>
+      <button class="suggestion-btn" onclick="useSuggestion('Crie um dashboard moderno com cards de métricas, gráficos e sidebar')">📊 Dashboard</button>
+      <button class="suggestion-btn" onclick="useSuggestion('Crie uma landing page para um estúdio de design com animações suaves')">✨ Estúdio</button>
+      <button class="suggestion-btn" onclick="useSuggestion('Crie um portfólio pessoal moderno com hero animado e seção de projetos')">👤 Portfólio</button>
     </div>
 
     <div class="img-preview-row hidden" id="imgPreviewRow">
-      <img class="img-preview-thumb" id="imgPreviewThumb" src="" alt="preview" />
+      <img class="img-preview-thumb" id="imgPreviewThumb" src="" alt="" />
       <span class="img-preview-name" id="imgPreviewName"></span>
       <button class="img-preview-remove" onclick="clearImage()">✕</button>
     </div>
 
     <div class="chat-input-row">
-      <button class="img-btn" title="Enviar imagem" onclick="document.getElementById('imageInput').click()">📷</button>
+      <button class="img-btn" onclick="document.getElementById('imageInput').click()" title="Enviar imagem">📷</button>
       <input type="file" id="imageInput" accept="image/*" />
       <textarea class="chat-input" id="chatInput" placeholder="Descreva o que quer criar..." rows="1"></textarea>
       <button class="send-btn" id="sendBtn">↑</button>
     </div>
   </div>
 
-  <!-- RIGHT: PREVIEW + CODE -->
+  <!-- RIGHT -->
   <div class="right-panel">
     <div class="right-topbar">
       <div class="view-tabs">
@@ -155,25 +145,24 @@
       </div>
       <div class="topbar-right">
         <span class="status-bar" id="statusBar">aguardando...</span>
-        <button class="topbar-btn" onclick="copyCode()" id="copyBtn" style="display:none">📋 Copiar</button>
-        <button class="topbar-btn" onclick="convertReact()" id="convertBtn" style="display:none">⚡ React → HTML</button>
+        <button class="topbar-btn" id="openBtn" style="display:none" onclick="openInStackBlitz()">↗ Abrir no StackBlitz</button>
       </div>
     </div>
 
-    <div class="preview-area" id="previewArea">
-      <div class="preview-empty" id="previewEmpty">
-        <div class="preview-empty-icon">⬡</div>
-        <h3>Nenhum projeto ainda</h3>
-        <p>Descreva o que quer criar no chat ao lado e a IA vai gerar o código e mostrar aqui.</p>
-      </div>
-      <iframe class="preview-frame" id="previewFrame" sandbox="allow-scripts allow-same-origin"></iframe>
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">⬡</div>
+      <h3>Nenhum projeto ainda</h3>
+      <p>Descreva o que quer criar no chat e a IA vai gerar um projeto React completo.</p>
     </div>
 
-    <div class="code-area" id="codeArea">
-      <textarea class="code-editor" id="codeEditor" placeholder="O código gerado aparecerá aqui..."></textarea>
+    <div class="stackblitz-area" id="stackblitzArea">
+      <div class="loading-overlay active" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text" id="loadingText">Gerando projeto...</div>
+      </div>
+      <div id="stackblitzEmbed"></div>
     </div>
   </div>
-
 </div>
 
 <script>
@@ -181,20 +170,21 @@
   const chatInput = document.getElementById('chatInput');
   const sendBtn = document.getElementById('sendBtn');
   const imageInput = document.getElementById('imageInput');
-  const previewFrame = document.getElementById('previewFrame');
-  const previewEmpty = document.getElementById('previewEmpty');
-  const codeEditor = document.getElementById('codeEditor');
   const statusBar = document.getElementById('statusBar');
-  const copyBtn = document.getElementById('copyBtn');
-  const convertBtn = document.getElementById('convertBtn');
+  const emptyState = document.getElementById('emptyState');
+  const stackblitzArea = document.getElementById('stackblitzArea');
+  const loadingOverlay = document.getElementById('loadingOverlay');
+  const loadingText = document.getElementById('loadingText');
+  const openBtn = document.getElementById('openBtn');
 
   let currentImage = null;
-  let conversationHistory = [];
+  let currentProject = null; // stores generated files
+  let currentView = 'preview';
 
   // Auto-resize textarea
   chatInput.addEventListener('input', () => {
     chatInput.style.height = 'auto';
-    chatInput.style.height = Math.min(chatInput.scrollHeight, 100) + 'px';
+    chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
   });
 
   // Image handling
@@ -217,16 +207,25 @@
     document.getElementById('imgPreviewRow').classList.add('hidden');
   }
 
-  // Drag and drop
+  // Drag & drop
   document.addEventListener('dragover', e => { e.preventDefault(); document.getElementById('dropOverlay').classList.add('active'); });
   document.addEventListener('dragleave', e => { if (!e.relatedTarget) document.getElementById('dropOverlay').classList.remove('active'); });
   document.addEventListener('drop', e => {
-    e.preventDefault(); document.getElementById('dropOverlay').classList.remove('active');
+    e.preventDefault();
+    document.getElementById('dropOverlay').classList.remove('active');
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith('image/')) loadImage(file);
   });
 
-  // Messages
+  // Paste image
+  document.addEventListener('paste', e => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) { loadImage(item.getAsFile()); break; }
+    }
+  });
+
   function addMessage(text, type) {
     const msg = document.createElement('div');
     msg.className = `msg ${type}`;
@@ -236,27 +235,65 @@
     return msg;
   }
 
-  function updatePreview(code) {
-    codeEditor.value = code;
-    previewEmpty.style.display = 'none';
-    previewFrame.style.display = 'block';
-    previewFrame.srcdoc = code;
-    statusBar.textContent = '● ao vivo';
-    statusBar.style.color = 'var(--green)';
-    copyBtn.style.display = 'block';
-
-    // Show convert button if React code
-    const isReact = code.includes('"use client"') || code.includes("from 'react'") || code.includes('from "react"');
-    convertBtn.style.display = isReact ? 'block' : 'none';
-  }
-
   function useSuggestion(text) {
     chatInput.value = text;
     chatInput.style.height = 'auto';
     sendMessage();
   }
 
-  // MAIN SEND
+  // LAUNCH STACKBLITZ
+  function launchStackBlitz(files) {
+    currentProject = files;
+    emptyState.classList.add('hidden');
+    stackblitzArea.classList.add('active');
+    loadingOverlay.classList.add('active');
+    loadingText.textContent = 'Iniciando StackBlitz...';
+
+    // Clear previous embed
+    document.getElementById('stackblitzEmbed').innerHTML = '';
+
+    const project = {
+      title: 'CodeAI Project',
+      description: 'Generated by CodeAI',
+      template: 'node',
+      files: files
+    };
+
+    StackBlitzSDK.embedProject('stackblitzEmbed', project, {
+      openFile: currentView === 'code' ? 'src/App.tsx' : undefined,
+      view: currentView === 'code' ? 'editor' : 'preview',
+      hideNavigation: false,
+      hideDevTools: false,
+      height: '100%',
+    }).then(() => {
+      loadingOverlay.classList.remove('active');
+      statusBar.textContent = '● ao vivo';
+      statusBar.style.color = 'var(--green)';
+      openBtn.style.display = 'block';
+    }).catch(err => {
+      loadingText.textContent = 'Erro ao carregar StackBlitz: ' + err.message;
+    });
+  }
+
+  function openInStackBlitz() {
+    if (!currentProject) return;
+    StackBlitzSDK.openProject({
+      title: 'CodeAI Project',
+      template: 'node',
+      files: currentProject
+    });
+  }
+
+  function switchView(view) {
+    currentView = view;
+    document.getElementById('tabPreview').classList.toggle('active', view === 'preview');
+    document.getElementById('tabCode').classList.toggle('active', view === 'code');
+
+    // If project exists, reload with new view
+    if (currentProject) launchStackBlitz(currentProject);
+  }
+
+  // SEND MESSAGE
   async function sendMessage() {
     const userMsg = chatInput.value.trim();
     if (!userMsg && !currentImage) return;
@@ -267,80 +304,52 @@
     chatInput.style.height = 'auto';
     sendBtn.disabled = true;
 
-    // Add to history
-    conversationHistory.push({ role: 'user', content: userMsg || 'Analise esta imagem e crie o código HTML.' });
-
-    const currentCode = codeEditor.value.trim();
-    const hasCode = currentCode.length > 0;
-
-    const thinkingMsg = addMessage('⟳ Pensando...', 'ai loading');
+    const loadingMsg = addMessage('⟳ Gerando projeto React...', 'ai loading');
     statusBar.textContent = 'gerando...';
     statusBar.style.color = 'var(--text-muted)';
 
+    // Show stackblitz area with loading
+    emptyState.classList.add('hidden');
+    stackblitzArea.classList.add('active');
+    loadingOverlay.classList.add('active');
+    loadingText.textContent = 'Claude está gerando o projeto...';
+
     try {
-      let result;
+      let files;
 
       if (currentImage) {
-        // IMAGE MODE — Anthropic direct
-        thinkingMsg.textContent = '🤖 Claude analisando imagem...';
         const imageData = { ...currentImage };
         clearImage();
-
-        const prompt = userMsg || 'Analise este design/componente e gere um arquivo HTML completo e funcional que replique exatamente o que você vê. Use CSS moderno com animações se necessário. Retorne APENAS o HTML completo, sem explicações, sem markdown.';
-
+        const prompt = userMsg || 'Analise este design e recrie como um projeto React com Tailwind.';
         const response = await fetch('/api/image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: imageData.base64, mediaType: imageData.mediaType, prompt })
+          body: JSON.stringify({ image: imageData.base64, mediaType: imageData.mediaType, prompt, mode: 'react' })
         });
         if (!response.ok) { const e = await response.json(); throw new Error(e.error); }
         const data = await response.json();
-        result = data.result;
-
+        files = data.files;
       } else {
-        // TEXT MODE — build smart prompt
-        let systemPrompt = `Você é um especialista sênior em HTML, CSS e JavaScript que cria interfaces de alta qualidade.
-
-REGRAS IMPORTANTES:
-- Retorne SEMPRE apenas código HTML completo e funcional, sem explicações, sem markdown
-- Use CSS moderno: gradients, animations, flexbox, grid, glassmorphism quando apropriado
-- Código limpo, bem estruturado, visualmente impressionante
-- Se usar Three.js, importe via CDN do cdnjs
-- Sem imports ES6, sem React, sem build tools — HTML puro que roda no browser`;
-
-        let userPrompt;
-
-        if (hasCode) {
-          // MODIFY existing code
-          userPrompt = `Código atual:\n\`\`\`html\n${currentCode}\n\`\`\`\n\nPedido: ${userMsg}\n\nRetorne o código HTML completo modificado.`;
-        } else {
-          // CREATE from scratch
-          userPrompt = `Crie: ${userMsg}\n\nCrie um HTML completo, moderno e visualmente impressionante. Seja criativo e detalhado.`;
-        }
-
-        const response = await fetch('/api/chat', {
+        const response = await fetch('/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: `${systemPrompt}\n\n${userPrompt}`, code: currentCode })
+          body: JSON.stringify({ prompt: userMsg, currentFiles: currentProject })
         });
         if (!response.ok) { const e = await response.json(); throw new Error(e.error); }
         const data = await response.json();
-        result = data.result;
+        files = data.files;
       }
 
-      // Clean result
-      result = result.trim().replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim();
+      loadingText.textContent = 'Iniciando StackBlitz...';
+      launchStackBlitz(files);
 
-      // Add to history
-      conversationHistory.push({ role: 'assistant', content: 'Código gerado com sucesso.' });
-
-      updatePreview(result);
-      thinkingMsg.textContent = hasCode ? '✓ Código atualizado!' : '✓ Criado com sucesso!';
-      thinkingMsg.className = 'msg ai';
+      loadingMsg.textContent = '✓ Projeto gerado! Veja o preview →';
+      loadingMsg.className = 'msg ai';
 
     } catch (err) {
-      thinkingMsg.textContent = `✗ Erro: ${err.message}`;
-      thinkingMsg.className = 'msg ai';
+      loadingMsg.textContent = `✗ Erro: ${err.message}`;
+      loadingMsg.className = 'msg ai';
+      loadingOverlay.classList.remove('active');
       statusBar.textContent = 'erro';
       statusBar.style.color = '#ef4444';
     }
@@ -348,87 +357,9 @@ REGRAS IMPORTANTES:
     sendBtn.disabled = false;
   }
 
-  // VIEW SWITCHING
-  function switchView(view) {
-    const previewArea = document.getElementById('previewArea');
-    const codeArea = document.getElementById('codeArea');
-    const tabP = document.getElementById('tabPreview');
-    const tabC = document.getElementById('tabCode');
-
-    if (view === 'preview') {
-      previewArea.style.display = 'block';
-      codeArea.classList.remove('active');
-      tabP.classList.add('active');
-      tabC.classList.remove('active');
-    } else {
-      previewArea.style.display = 'none';
-      codeArea.classList.add('active');
-      tabP.classList.remove('active');
-      tabC.classList.add('active');
-    }
-  }
-
-  // Live update from code editor
-  let previewTimeout;
-  codeEditor.addEventListener('input', () => {
-    clearTimeout(previewTimeout);
-    previewTimeout = setTimeout(() => {
-      const code = codeEditor.value.trim();
-      if (code) {
-        previewFrame.srcdoc = code;
-        previewEmpty.style.display = 'none';
-        previewFrame.style.display = 'block';
-      }
-    }, 500);
-  });
-
-  // Copy code
-  function copyCode() {
-    navigator.clipboard.writeText(codeEditor.value);
-    copyBtn.textContent = '✓ Copiado!';
-    setTimeout(() => copyBtn.textContent = '📋 Copiar', 2000);
-  }
-
-  // Convert React
-  async function convertReact() {
-    const code = codeEditor.value.trim();
-    if (!code) return;
-    convertBtn.disabled = true;
-    convertBtn.textContent = '⟳ Convertendo...';
-    const loadingMsg = addMessage('⚡ Convertendo React → HTML...', 'ai loading');
-    const threeCDN = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
-    const prompt = `Converta este React/TSX para HTML puro. Use Three.js via CDN (${threeCDN}) se necessário. Sem imports, sem JSX. Retorne APENAS o HTML:\n\n${code}`;
-    try {
-      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, code }) });
-      const data = await res.json();
-      let result = data.result.trim().replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim();
-      updatePreview(result);
-      loadingMsg.textContent = '✓ Convertido!';
-      loadingMsg.className = 'msg ai';
-    } catch (err) {
-      loadingMsg.textContent = `✗ Erro: ${err.message}`;
-      loadingMsg.className = 'msg ai';
-    }
-    convertBtn.disabled = false;
-    convertBtn.textContent = '⚡ React → HTML';
-  }
-
-  // Keyboard
   sendBtn.addEventListener('click', sendMessage);
   chatInput.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-  });
-
-  // Paste image
-  document.addEventListener('paste', e => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-    for (const item of items) {
-      if (item.type.startsWith('image/')) {
-        const file = item.getAsFile();
-        if (file) { loadImage(file); break; }
-      }
-    }
   });
 </script>
 </body>
