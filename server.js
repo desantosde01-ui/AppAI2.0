@@ -80,19 +80,37 @@ function buildPrompt(userRequest, currentAppCode, chatHistory) {
     'Make sure ALL JSX tags are properly closed'
   ].join('\n- ');
 
-  // Build conversation context
-  let historyContext = '';
-  if (chatHistory && chatHistory.length > 1) {
-    const prev = chatHistory.slice(0, -1); // exclude current message
-    historyContext = '\n\nCONVERSATION HISTORY (for context):\n' + 
-      prev.map(m => m.role.toUpperCase() + ': ' + m.content).join('\n') + '\n';
-  }
-
   if (isModify) {
-    return 'You are a senior React + TypeScript + Tailwind CSS expert.' + historyContext + '\n\nMODIFY this existing component as requested. Keep everything that was not mentioned, only change what was asked.\n\nRULES:\n- ' + rules + '\n\nCURRENT App.tsx CODE:\n' + currentAppCode + '\n\nUSER REQUEST: ' + userRequest + '\n\nReturn the complete modified App.tsx:';
+    return [
+      'You are a senior React + TypeScript + Tailwind CSS expert.',
+      '',
+      '!!! IMPORTANT: You are EDITING an existing project. DO NOT create a new project from scratch.',
+      'The user has an existing React app and wants a SPECIFIC CHANGE. Make ONLY that change.',
+      'Keep the entire structure, content, purpose and style of the app. Only modify what was explicitly asked.',
+      '',
+      'RULES:',
+      '- ' + rules,
+      '',
+      '=== CURRENT App.tsx (DO NOT rewrite from scratch, only edit) ===',
+      currentAppCode,
+      '=== END OF CURRENT CODE ===',
+      '',
+      'USER CHANGE REQUEST: ' + userRequest,
+      '',
+      'Apply ONLY this change to the existing code above. Return the complete modified App.tsx:'
+    ].join('\n');
   }
 
-  return 'You are a senior React + TypeScript + Tailwind CSS expert. Create stunning, professional UI.' + historyContext + '\n\nRULES:\n- ' + rules + '\n\nCreate a complete, visually impressive React app for: ' + userRequest + '\n\nReturn only the App.tsx code:';
+  return [
+    'You are a senior React + TypeScript + Tailwind CSS expert. Create stunning, professional UI.',
+    '',
+    'RULES:',
+    '- ' + rules,
+    '',
+    'Create a complete, visually impressive React app for: ' + userRequest,
+    '',
+    'Return only the App.tsx code:'
+  ].join('\n');
 }
 
 async function callOpenRouter(prompt) {
