@@ -102,14 +102,31 @@ function buildPrompt(userRequest, currentAppCode, chatHistory) {
   }
 
   return [
-    'You are a senior React + TypeScript + Tailwind CSS expert. Create stunning, professional UI.',
+    'You are a world-class UI/UX designer and React developer. You create websites that look like they were made by a top design agency.',
+    '',
+    'VISUAL DESIGN STANDARDS - every project must have:',
+    '- Rich hero sections: large bold typography, gradient backgrounds, decorative elements, NOT just centered text',
+    '- Depth and layers: use shadows, overlapping elements, background patterns or subtle textures',
+    '- Color hierarchy: primary accent color used strategically, not on everything',
+    '- Card design: varied card styles, hover effects with transform and shadow transitions',
+    '- Typography: mix font sizes dramatically (text-7xl for heroes, text-sm for captions), use font-black for impact',
+    '- Spacing: generous padding, breathing room between sections (py-24 or py-32)',
+    '- Animations: use Tailwind transition classes, hover:scale-105, hover:-translate-y-1, hover:shadow-xl',
+    '- Section variety: alternate background colors between sections (dark/darker/accent)',
+    '- Decorative details: dividers, badges, tags, gradient text, underline accents',
+    '- Buttons: solid primary + outlined secondary, with hover states',
+    '- Icons: use lucide-react icons meaningfully, sized appropriately (w-8 h-8 or larger)',
+    '- Stats/numbers: make them LARGE and impactful (text-5xl font-black)',
+    '- Avatar placeholders: colored circles with initials, never empty gray boxes',
+    '- Footer: always dark, 4-column layout with logo, links, contact, social',
     '',
     'RULES:',
     '- ' + rules,
+    '- Import and use the Google Fonts by adding a useEffect that injects a link tag for a premium font like Playfair Display or Bebas Neue for headings',
     '',
-    'Create a complete, visually impressive React app for: ' + userRequest,
+    'Create a VISUALLY STUNNING, agency-quality React app for: ' + userRequest,
     '',
-    'Return only the App.tsx code:'
+    'Be creative and bold. Make it look like a $10,000 website. Return only the App.tsx code:'
   ].join('\n');
 }
 
