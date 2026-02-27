@@ -178,8 +178,10 @@
   const openBtn = document.getElementById('openBtn');
 
   let currentImage = null;
-  let currentProject = null; // stores generated files
+  let currentAppCode = null; // stores current App.tsx code
+  let currentProject = null; // stores all files for StackBlitz
   let currentView = 'preview';
+  let chatHistory = []; // stores conversation history
 
   // Auto-resize textarea
   chatInput.addEventListener('input', () => {
@@ -243,7 +245,7 @@
 
   // LAUNCH STACKBLITZ
   function launchStackBlitz(files) {
-    currentProject = files;
+    currentProject = files; // only files, appCode is stored separately
     emptyState.classList.add('hidden');
     stackblitzArea.classList.add('active');
     loadingOverlay.classList.add('active');
@@ -314,36 +316,46 @@
     loadingOverlay.classList.add('active');
     loadingText.textContent = 'Claude está gerando o projeto...';
 
+    // Add to chat history
+    chatHistory.push({ role: 'user', content: userMsg || 'Analyze this image and create a React app.' });
+
     try {
       let files;
 
       if (currentImage) {
         const imageData = { ...currentImage };
         clearImage();
-        const prompt = userMsg || 'Analise este design e recrie como um projeto React com Tailwind.';
+        const prompt = userMsg || 'Analyze this design and recreate as a React project with Tailwind.';
         const response = await fetch('/api/image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: imageData.base64, mediaType: imageData.mediaType, prompt, mode: 'react' })
+          body: JSON.stringify({ image: imageData.base64, mediaType: imageData.mediaType, prompt })
         });
         if (!response.ok) { const e = await response.json(); throw new Error(e.error); }
         const data = await response.json();
-        files = data.files; currentProject = data;
+        files = data.files;
+        currentAppCode = data.appCode; // save App.tsx separately
       } else {
         const response = await fetch('/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: userMsg, currentAppCode: currentProject?.appCode })
+          body: JSON.stringify({
+            prompt: userMsg,
+            currentAppCode: currentAppCode, // always send current code for context
+            chatHistory: chatHistory.slice(-10) // send last 10 messages for context
+          })
         });
         if (!response.ok) { const e = await response.json(); throw new Error(e.error); }
         const data = await response.json();
-        files = data.files; currentProject = data;
+        files = data.files;
+        currentAppCode = data.appCode; // save App.tsx separately
       }
 
       loadingText.textContent = 'Iniciando StackBlitz...';
       launchStackBlitz(files);
 
-      loadingMsg.textContent = '✓ Projeto gerado! Veja o preview →';
+      chatHistory.push({ role: 'assistant', content: 'Project updated successfully.' });
+      loadingMsg.textContent = currentAppCode ? '✓ Projeto atualizado!' : '✓ Projeto criado!';
       loadingMsg.className = 'msg ai';
 
     } catch (err) {
