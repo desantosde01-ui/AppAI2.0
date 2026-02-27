@@ -65,7 +65,7 @@ function getBaseFiles(appCode) {
   };
 }
 
-function buildPrompt(userRequest, currentAppCode) {
+function buildPrompt(userRequest, currentAppCode, chatHistory) {
   const isModify = !!currentAppCode;
 
   const rules = [
@@ -80,11 +80,19 @@ function buildPrompt(userRequest, currentAppCode) {
     'Make sure ALL JSX tags are properly closed'
   ].join('\n- ');
 
-  if (isModify) {
-    return 'You are a senior React + TypeScript + Tailwind CSS expert.\n\nMODIFY this component as requested.\n\nRULES:\n- ' + rules + '\n\nCurrent code:\n' + currentAppCode + '\n\nRequest: ' + userRequest + '\n\nReturn the complete modified App.tsx code:';
+  // Build conversation context
+  let historyContext = '';
+  if (chatHistory && chatHistory.length > 1) {
+    const prev = chatHistory.slice(0, -1); // exclude current message
+    historyContext = '\n\nCONVERSATION HISTORY (for context):\n' + 
+      prev.map(m => m.role.toUpperCase() + ': ' + m.content).join('\n') + '\n';
   }
 
-  return 'You are a senior React + TypeScript + Tailwind CSS expert. Create stunning, professional UI.\n\nRULES:\n- ' + rules + '\n\nCreate a complete, visually impressive React app for: ' + userRequest + '\n\nReturn only the App.tsx code:';
+  if (isModify) {
+    return 'You are a senior React + TypeScript + Tailwind CSS expert.' + historyContext + '\n\nMODIFY this existing component as requested. Keep everything that was not mentioned, only change what was asked.\n\nRULES:\n- ' + rules + '\n\nCURRENT App.tsx CODE:\n' + currentAppCode + '\n\nUSER REQUEST: ' + userRequest + '\n\nReturn the complete modified App.tsx:';
+  }
+
+  return 'You are a senior React + TypeScript + Tailwind CSS expert. Create stunning, professional UI.' + historyContext + '\n\nRULES:\n- ' + rules + '\n\nCreate a complete, visually impressive React app for: ' + userRequest + '\n\nReturn only the App.tsx code:';
 }
 
 async function callOpenRouter(prompt) {
@@ -141,11 +149,11 @@ async function callAnthropicVision(image, mediaType, prompt) {
 }
 
 app.post('/api/generate', async (req, res) => {
-  const { prompt, currentAppCode } = req.body;
+  const { prompt, currentAppCode, chatHistory } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt required' });
 
   try {
-    const appCode = await callOpenRouter(buildPrompt(prompt, currentAppCode));
+    const appCode = await callOpenRouter(buildPrompt(prompt, currentAppCode, chatHistory));
     const files = getBaseFiles(appCode);
     res.json({ files, appCode });
   } catch (err) {
