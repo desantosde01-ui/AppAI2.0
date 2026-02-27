@@ -102,31 +102,23 @@ function buildPrompt(userRequest, currentAppCode, chatHistory) {
   }
 
   return [
-    'You are a world-class UI/UX designer and React developer. You create websites that look like they were made by a top design agency.',
+    'You are a world-class UI/UX designer and React developer creating agency-quality websites.',
     '',
-    'VISUAL DESIGN STANDARDS - every project must have:',
-    '- Rich hero sections: large bold typography, gradient backgrounds, decorative elements, NOT just centered text',
-    '- Depth and layers: use shadows, overlapping elements, background patterns or subtle textures',
-    '- Color hierarchy: primary accent color used strategically, not on everything',
-    '- Card design: varied card styles, hover effects with transform and shadow transitions',
-    '- Typography: mix font sizes dramatically (text-7xl for heroes, text-sm for captions), use font-black for impact',
-    '- Spacing: generous padding, breathing room between sections (py-24 or py-32)',
-    '- Animations: use Tailwind transition classes, hover:scale-105, hover:-translate-y-1, hover:shadow-xl',
-    '- Section variety: alternate background colors between sections (dark/darker/accent)',
-    '- Decorative details: dividers, badges, tags, gradient text, underline accents',
-    '- Buttons: solid primary + outlined secondary, with hover states',
-    '- Icons: use lucide-react icons meaningfully, sized appropriately (w-8 h-8 or larger)',
-    '- Stats/numbers: make them LARGE and impactful (text-5xl font-black)',
-    '- Avatar placeholders: colored circles with initials, never empty gray boxes',
-    '- Footer: always dark, 4-column layout with logo, links, contact, social',
+    'DESIGN REQUIREMENTS:',
+    '- Hero: large bold typography (text-7xl+), gradient background, NOT just centered text on black',
+    '- Sections: alternate bg colors (zinc-950 / zinc-900 / zinc-800), generous spacing (py-24)',
+    '- Cards: hover:scale-105 hover:shadow-xl hover:-translate-y-1 transition-all duration-300',
+    '- Stats: text-5xl font-black, impactful and large',
+    '- Avatars: always colored circles with initials, never empty boxes',
+    '- Typography: inject Google Font via useEffect (e.g. Playfair Display or Bebas Neue for headings)',
+    '- Buttons: one solid + one outlined variant, both with hover states',
+    '- Details: gradient text on headings, decorative dividers, badge elements',
     '',
     'RULES:',
     '- ' + rules,
-    '- Import and use the Google Fonts by adding a useEffect that injects a link tag for a premium font like Playfair Display or Bebas Neue for headings',
     '',
-    'Create a VISUALLY STUNNING, agency-quality React app for: ' + userRequest,
-    '',
-    'Be creative and bold. Make it look like a $10,000 website. Return only the App.tsx code:'
+    'Create a stunning React app for: ' + userRequest,
+    'Return only App.tsx code:'
   ].join('\n');
 }
 
