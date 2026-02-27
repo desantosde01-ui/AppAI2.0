@@ -170,13 +170,6 @@ app.post('/api/generate', async (req, res) => {
   const { prompt, currentAppCode, chatHistory } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt required' });
 
-  // DEBUG: log what we received
-  console.log('=== /api/generate ===');
-  console.log('prompt:', prompt);
-  console.log('hasCurrentAppCode:', !!currentAppCode);
-  console.log('currentAppCodeLength:', currentAppCode ? currentAppCode.length : 0);
-  console.log('=====================');
-
   try {
     const appCode = await callOpenRouter(buildPrompt(prompt, currentAppCode, chatHistory));
     const files = getBaseFiles(appCode);
