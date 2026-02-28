@@ -54,9 +54,10 @@ const UNSPLASH_IMAGES = {
     'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&q=80',
   ],
   beauty: [
-    'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=1200&q=80',
-    'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&q=80',
-    'https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=800&q=80',
+    'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=1200&q=80',
+    'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=800&q=80',
+    'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&q=80',
+    'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=80',
   ],
   fitness: [
     'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1200&q=80',
@@ -86,6 +87,7 @@ const UNSPLASH_IMAGES = {
 function detectNiche(prompt) {
   const p = prompt.toLowerCase();
   if (/barber|barbearia|cabeleir|haircut|salao de corte/.test(p)) return 'barbershop';
+  if (/pilates|fisioterapia|yoga|wellness|bem.estar|meditacao/.test(p)) return 'beauty';
   if (/restauran|food|comida|cafe|cafeteria|pizza|burger|hamburguer|bistro/.test(p)) return 'restaurant';
   if (/law|advogad|juridic|advocacia|lawyer|legal/.test(p)) return 'law';
   if (/tech|software|startup|saas|app|sistema|digital agency/.test(p)) return 'tech';
@@ -219,6 +221,14 @@ function buildPrompt(userRequest, currentAppCode, chatHistory) {
     '- Avatars: colored gradient circles with initials, never empty boxes',
     '- Buttons: solid primary + outlined secondary with hover states',
     '- Add subtle section dividers and decorative elements',
+    '',
+    'CRITICAL BUGS TO AVOID:',
+    '- Images: ALWAYS use the exact Unsplash URLs provided above - NEVER use placeholder or random images',
+    '- Z-index: hero section must have z-index: 0, all other sections z-index: 0, never let content float over hero',
+    '- Parallax: if using parallax effect, use background-attachment: scroll NOT fixed, and wrap in overflow: hidden',
+    '- Custom cursor: if adding cursor effect, use mousemove event with NO transition/animation delay on the cursor element itself - cursor must follow mouse instantly with transform: translate(x, y)',
+    '- Section containers: always add overflow: hidden to section wrappers that contain animated elements',
+    '- Image hover effects: never use position: fixed on images, use transform: scale() instead',
     '',
     'RULES:\n- ' + rules,
     '',
