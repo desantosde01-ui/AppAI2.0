@@ -14,7 +14,6 @@ app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ─── FONT PAIRS BY NICHE ─────────────────────────────────────────────────────
 const FONT_PAIRS = {
   barbershop:   { heading: 'Bebas Neue',         body: 'Inter',           url: 'Bebas+Neue|Inter:wght@400;500;600' },
   restaurant:   { heading: 'Cormorant Garamond',  body: 'Nunito',          url: 'Cormorant+Garamond:wght@600;700|Nunito:wght@400;600' },
@@ -34,7 +33,6 @@ const FONT_PAIRS = {
   default:      { heading: 'Plus Jakarta Sans',   body: 'Inter',           url: 'Plus+Jakarta+Sans:wght@600;700;800|Inter:wght@400;500;600' },
 };
 
-// ─── SANITIZE CODE ────────────────────────────────────────────────────────────
 function sanitizeCode(code) {
   code = code.trim();
   code = code.replace(/^```[a-zA-Z]*\n/, '');
@@ -60,14 +58,16 @@ async function generateDeepAIImage(prompt) {
     });
 
     if (!response.ok) {
-      console.error('DeepAI error:', response.status);
+      console.error('DeepAI error status:', response.status);
       return null;
     }
 
     const data = await response.json();
     if (data.output_url) {
+      console.log('DeepAI image generated:', data.output_url);
       return { url: data.output_url, alt: prompt };
     }
+    console.error('DeepAI no output_url:', JSON.stringify(data));
     return null;
   } catch (err) {
     console.error('DeepAI error:', err.message);
@@ -77,16 +77,14 @@ async function generateDeepAIImage(prompt) {
 
 async function getImagesForPrompt(userPrompt) {
   try {
-    // Ask Claude to create specific image prompts for this business
     const promptGeneration = 'Based on this website request: "' + userPrompt + '", generate 4 specific English image prompts for AI image generation. Each prompt should describe a professional, high-quality photo relevant to this business. Return ONLY a JSON array of 4 strings, nothing else. Example: ["professional barbershop interior with leather chairs", "barber cutting hair close up", "razor and grooming tools on marble", "stylish man after haircut"]';
-    
+
     const raw = await callOpenRouter(promptGeneration);
     const clean = raw.replace(/```json|```/g, '').trim();
     let prompts;
     try {
       prompts = JSON.parse(clean);
     } catch(e) {
-      // fallback: use generic prompts based on first words
       const topic = userPrompt.slice(0, 50);
       prompts = [
         'professional ' + topic + ' interior photography',
@@ -97,14 +95,14 @@ async function getImagesForPrompt(userPrompt) {
     }
 
     console.log('Generating', prompts.length, 'images with DeepAI...');
+    console.log('Image prompts:', prompts);
 
-    // Generate all images in parallel
     const results = await Promise.all(
       prompts.slice(0, 4).map(function(p) { return generateDeepAIImage(p); })
     );
 
     const images = results.filter(function(r) { return r !== null; });
-    console.log('Generated', images.length, 'images successfully');
+    console.log('DeepAI: Generated', images.length, 'of', prompts.length, 'images successfully');
     return images.length > 0 ? images : null;
   } catch (err) {
     console.error('getImagesForPrompt error:', err.message);
@@ -112,7 +110,6 @@ async function getImagesForPrompt(userPrompt) {
   }
 }
 
-// ─── BASE FILES ───────────────────────────────────────────────────────────────
 function getBaseFiles(appCode) {
   return {
     'package.json': JSON.stringify({
@@ -149,7 +146,6 @@ function getBaseFiles(appCode) {
   };
 }
 
-// ─── BUILD PROMPT ─────────────────────────────────────────────────────────────
 function buildPrompt(userRequest, currentAppCode, chatHistory, images) {
   const isModify = !!currentAppCode;
 
@@ -162,7 +158,14 @@ function buildPrompt(userRequest, currentAppCode, chatHistory, images) {
     'No external imports besides react and lucide-react',
     'Use only ASCII characters in strings and JSX text',
     'ALL strings must be properly closed',
-    'ALL JSX tags must be properly closed'
+    'ALL JSX tags must be properly closed',
+    'NEVER use inline style with CSS grid - use Tailwind grid-cols-* classes instead',
+    'NEVER use style={{ gridTemplateColumns: ... }} anywhere - forbidden',
+    'NEVER use window.innerWidth inside JSX or style props - use Tailwind responsive prefixes (sm: md: lg:) instead',
+    'For responsive layouts use Tailwind: className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3"',
+    'For responsive visibility use Tailwind: className="hidden md:flex" or className="flex md:hidden"',
+    'Count every opening { and make sure it has a matching closing }',
+    'Count every opening ( and make sure it has a matching closing )'
   ].join('\n- ');
 
   if (isModify) {
@@ -184,7 +187,6 @@ function buildPrompt(userRequest, currentAppCode, chatHistory, images) {
     ].join('\n');
   }
 
-  // Font selection based on keywords in prompt
   const p2 = userRequest.toLowerCase();
   let fonts = FONT_PAIRS.default;
   if (/barber|barbearia|haircut/.test(p2)) fonts = FONT_PAIRS.barbershop;
@@ -208,12 +210,12 @@ function buildPrompt(userRequest, currentAppCode, chatHistory, images) {
   ].join('\n');
 
   const imageInstruction = images && images.length > 0 ? [
-    'IMAGES: Use these real Pexels photos (use the URLs directly in <img> tags):',
+    'IMAGES: Use these AI-generated images (use the URLs directly in <img> tags):',
     images.map(function(img, i) { return '  Image ' + (i+1) + ': ' + img.url + ' (alt: "' + img.alt + '")'; }).join('\n'),
     '  - Use Image 1 as hero background (full width, object-cover with dark overlay for text readability)',
     '  - Use other images in gallery, team, or feature sections',
     '  - Always add loading="lazy" and proper alt text',
-  ].join('\n') : 'IMAGES: Use relevant Unsplash images for the content.';
+  ].join('\n') : 'IMAGES: Use relevant placeholder images for the content.';
 
   return [
     'You are a world-class UI/UX designer and React developer creating agency-quality websites.',
@@ -232,7 +234,7 @@ function buildPrompt(userRequest, currentAppCode, chatHistory, images) {
     '- Add subtle section dividers and decorative elements',
     '',
     'CRITICAL BUGS TO AVOID:',
-    '- Images: ALWAYS use the exact Unsplash URLs provided above - NEVER use placeholder or random images',
+    '- Images: ALWAYS use the exact AI-generated image URLs provided above - NEVER use placeholder or random images',
     '- Z-index: hero section must have z-index: 0, all other sections z-index: 0, never let content float over hero',
     '- Parallax: if using parallax effect, use background-attachment: scroll NOT fixed, and wrap in overflow: hidden',
     '- Custom cursor: if adding cursor effect, use mousemove event with NO transition/animation delay on the cursor element itself - cursor must follow mouse instantly with transform: translate(x, y)',
@@ -246,7 +248,6 @@ function buildPrompt(userRequest, currentAppCode, chatHistory, images) {
   ].join('\n');
 }
 
-// ─── OPENROUTER CALL ──────────────────────────────────────────────────────────
 async function callOpenRouter(prompt) {
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -270,7 +271,6 @@ async function callOpenRouter(prompt) {
   return sanitizeCode(data.choices[0].message.content);
 }
 
-// ─── ANTHROPIC VISION ─────────────────────────────────────────────────────────
 async function callAnthropicVision(image, mediaType, prompt) {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -301,18 +301,16 @@ async function callAnthropicVision(image, mediaType, prompt) {
   return sanitizeCode(data.content[0].text);
 }
 
-// ─── ROUTES ───────────────────────────────────────────────────────────────────
 app.post('/api/generate', async (req, res) => {
   const { prompt, currentAppCode, chatHistory } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt required' });
 
   try {
-    // Only search for images when creating a new project, not editing
     let images = null;
     if (!currentAppCode) {
-      console.log('Fetching Pexels images for:', prompt);
+      console.log('Generating DeepAI images for:', prompt);
       images = await getImagesForPrompt(prompt);
-      console.log('Got images:', images ? images.length : 0);
+      console.log('DeepAI result:', images ? images.length + ' images' : 'failed, no images');
     }
 
     const appCode = await callOpenRouter(buildPrompt(prompt, currentAppCode, chatHistory, images));
