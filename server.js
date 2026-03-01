@@ -9,6 +9,7 @@ const PORT = process.env.PORT || 3000;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const PEXELS_API_KEY = process.env.PEXELS_API_KEY || 'PbEyIVHVYeHKRD7Kc9bp9KNZIenwlMGYpK3J3JgHkfAAnRogAToxbZTt';
+const DEEPAI_API_KEY = process.env.DEEPAI_API_KEY || '2bdebb88-edf3-4aaf-9ed8-1def7cefa235';
 
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
@@ -47,45 +48,65 @@ function sanitizeCode(code) {
   return code;
 }
 
-// ─── PEXELS IMAGE SEARCH ─────────────────────────────────────────────────────
-async function searchPexelsImages(query, count) {
-  count = count || 4;
+// ─── DEEPAI IMAGE GENERATION ─────────────────────────────────────────────────
+async function generateDeepAIImage(prompt) {
   try {
-    const url = 'https://api.pexels.com/v1/search?query=' + encodeURIComponent(query) + '&per_page=' + count + '&orientation=landscape';
-    const response = await fetch(url, {
-      headers: { 'Authorization': PEXELS_API_KEY }
+    const formData = new FormData();
+    formData.append('text', prompt);
+
+    const response = await fetch('https://api.deepai.org/api/text2img', {
+      method: 'POST',
+      headers: { 'api-key': DEEPAI_API_KEY },
+      body: formData
     });
-    if (!response.ok) return null;
+
+    if (!response.ok) {
+      console.error('DeepAI error:', response.status);
+      return null;
+    }
+
     const data = await response.json();
-    if (!data.photos || data.photos.length === 0) return null;
-    return data.photos.map(function(photo) {
-      return {
-        url: photo.src.large2x || photo.src.large,
-        alt: photo.alt || query
-      };
-    });
+    if (data.output_url) {
+      return { url: data.output_url, alt: prompt };
+    }
+    return null;
   } catch (err) {
-    console.error('Pexels error:', err.message);
+    console.error('DeepAI error:', err.message);
     return null;
   }
 }
 
 async function getImagesForPrompt(userPrompt) {
-  // Ask Claude to extract the best search keywords from the prompt
-  const keywordPrompt = 'Extract 2-3 English keywords for a stock photo search based on this request: "' + userPrompt + '". Return ONLY the keywords separated by spaces, nothing else. Example: "barbershop razor haircut" or "yoga studio wellness" or "restaurant food dining"';
-  
   try {
-    const keywordsRaw = await callOpenRouter(keywordPrompt);
-    const keywords = keywordsRaw.trim().replace(/[^a-zA-Z0-9 ]/g, '').trim();
-    console.log('Pexels search keywords:', keywords);
+    // Ask Claude to create specific image prompts for this business
+    const promptGeneration = 'Based on this website request: "' + userPrompt + '", generate 4 specific English image prompts for AI image generation. Each prompt should describe a professional, high-quality photo relevant to this business. Return ONLY a JSON array of 4 strings, nothing else. Example: ["professional barbershop interior with leather chairs", "barber cutting hair close up", "razor and grooming tools on marble", "stylish man after haircut"]';
     
-    const photos = await searchPexelsImages(keywords, 5);
-    if (!photos) {
-      // fallback: use the first word of user prompt
-      const fallback = userPrompt.split(' ')[0];
-      return await searchPexelsImages(fallback, 5);
+    const raw = await callOpenRouter(promptGeneration);
+    const clean = raw.replace(/```json|```/g, '').trim();
+    let prompts;
+    try {
+      prompts = JSON.parse(clean);
+    } catch(e) {
+      // fallback: use generic prompts based on first words
+      const topic = userPrompt.slice(0, 50);
+      prompts = [
+        'professional ' + topic + ' interior photography',
+        topic + ' service close up professional photo',
+        topic + ' team working professional',
+        topic + ' product or space elegant photography'
+      ];
     }
-    return photos;
+
+    console.log('Generating', prompts.length, 'images with DeepAI...');
+
+    // Generate all images in parallel
+    const results = await Promise.all(
+      prompts.slice(0, 4).map(function(p) { return generateDeepAIImage(p); })
+    );
+
+    const images = results.filter(function(r) { return r !== null; });
+    console.log('Generated', images.length, 'images successfully');
+    return images.length > 0 ? images : null;
   } catch (err) {
     console.error('getImagesForPrompt error:', err.message);
     return null;
