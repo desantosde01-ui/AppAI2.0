@@ -46,6 +46,15 @@ function sanitizeCode(code) {
   code = code.replace(/\u2018/g, "'").replace(/\u2019/g, "'");
   code = code.replace(/\u2013/g, '-').replace(/\u2014/g, '-');
   code = code.replace(/\u00A0/g, ' ');
+  // Remove duplicate import React statements - keep only the first one
+  let reactImportFound = false;
+  code = code.split('\n').filter(function(line) {
+    if (/^import React/.test(line.trim())) {
+      if (reactImportFound) return false;
+      reactImportFound = true;
+    }
+    return true;
+  }).join('\n');
   return code;
 }
 
