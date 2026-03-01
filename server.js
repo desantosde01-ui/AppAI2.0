@@ -8,7 +8,6 @@ const PORT = process.env.PORT || 3000;
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const PEXELS_API_KEY = process.env.PEXELS_API_KEY || 'PbEyIVHVYeHKRD7Kc9bp9KNZIenwlMGYpK3J3JgHkfAAnRogAToxbZTt';
 const DEEPAI_API_KEY = process.env.DEEPAI_API_KEY || '2bdebb88-edf3-4aaf-9ed8-1def7cefa235';
 
 app.use(cors());
