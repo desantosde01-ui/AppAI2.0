@@ -35,9 +35,13 @@ const FONT_PAIRS = {
 
 function sanitizeCode(code) {
   code = code.trim();
-  code = code.replace(/^```[a-zA-Z]*\n/, '');
-  code = code.replace(/\n```$/, '');
+  // Remove ALL markdown code fences anywhere in the code
+  code = code.replace(/^```[a-zA-Z]*\r?\n/gm, '');
+  code = code.replace(/^```\r?$/gm, '');
+  code = code.replace(/```[a-zA-Z]*\n/g, '');
+  code = code.replace(/```/g, '');
   code = code.trim();
+  // Fix smart quotes and special characters
   code = code.replace(/\u201C/g, '"').replace(/\u201D/g, '"');
   code = code.replace(/\u2018/g, "'").replace(/\u2019/g, "'");
   code = code.replace(/\u2013/g, '-').replace(/\u2014/g, '-');
