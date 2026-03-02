@@ -310,6 +310,33 @@
     if (currentProject) launchStackBlitz(currentProject);
   }
 
+  async function parseApiResponse(response) {
+    const rawText = await response.text();
+    let data = null;
+
+    if (rawText) {
+      try {
+        data = JSON.parse(rawText);
+      } catch (_) {
+        if (response.ok) {
+          throw new Error('Resposta inválida do servidor (esperado JSON).');
+        }
+      }
+    }
+
+    if (!response.ok) {
+      const serverMessage = data && data.error ? data.error : '';
+      const fallback = rawText ? rawText.slice(0, 200) : `HTTP ${response.status}`;
+      throw new Error(serverMessage || fallback);
+    }
+
+    if (!data) {
+      throw new Error('Servidor retornou resposta vazia. Tente novamente.');
+    }
+
+    return data;
+  }
+
   // SEND MESSAGE
   async function sendMessage() {
     const userMsg = chatInput.value.trim();
@@ -346,8 +373,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: imageData.base64, mediaType: imageData.mediaType, prompt })
         });
-        if (!response.ok) { const e = await response.json(); throw new Error(e.error); }
-        const data = await response.json();
+        const data = await parseApiResponse(response);
         files = data.files;
         currentAppCode = data.appCode; // save App.tsx separately
       } else {
@@ -360,8 +386,7 @@
             chatHistory: chatHistory.slice(-10) // send last 10 messages for context
           })
         });
-        if (!response.ok) { const e = await response.json(); throw new Error(e.error); }
-        const data = await response.json();
+        const data = await parseApiResponse(response);
         files = data.files;
         currentAppCode = data.appCode; // save App.tsx separately
       }
