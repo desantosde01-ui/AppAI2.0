@@ -327,10 +327,6 @@
     if (!response.ok) {
       const serverMessage = data && data.error ? data.error : '';
       const fallback = rawText ? rawText.slice(0, 200) : `HTTP ${response.status}`;
-      const endpoint = response.url ? new URL(response.url).pathname : 'endpoint desconhecido';
-      if (response.status === 405) {
-        throw new Error(`HTTP 405 em ${endpoint}. Verifique se a rota existe e aceita POST no backend.`);
-      }
       throw new Error(serverMessage || fallback);
     }
 
