@@ -183,6 +183,21 @@
   let currentView = 'preview';
   let chatHistory = []; // stores conversation history
 
+  async function checkServerSetup() {
+    try {
+      const response = await fetch('/api/health');
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!data.ok) {
+        statusBar.textContent = 'configuração pendente';
+        statusBar.style.color = '#f59e0b';
+        addMessage('⚠️ Configuração pendente no servidor: ' + data.issues.join(', ') + '. Defina OPENROUTER_API_KEY para habilitar a geração.', 'ai');
+      }
+    } catch (_) {
+      // silently ignore connectivity checks
+    }
+  }
+
   // Auto-resize textarea
   chatInput.addEventListener('input', () => {
     chatInput.style.height = 'auto';
@@ -359,7 +374,11 @@
       loadingMsg.className = 'msg ai';
 
     } catch (err) {
-      loadingMsg.textContent = `✗ Erro: ${err.message}`;
+      const errText = (err && err.message) ? err.message : 'erro inesperado';
+      const setupHint = errText.includes('OPENROUTER_API_KEY')
+        ? ' Dica: configure a variável OPENROUTER_API_KEY e reinicie o servidor.'
+        : '';
+      loadingMsg.textContent = `✗ Erro: ${errText}${setupHint}`;
       loadingMsg.className = 'msg ai';
       loadingOverlay.classList.remove('active');
       statusBar.textContent = 'erro';
@@ -373,6 +392,8 @@
   chatInput.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   });
+
+  checkServerSetup();
 </script>
 </body>
 </html>
