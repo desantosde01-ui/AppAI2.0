@@ -1,13 +1,13 @@
 // server.js
 const express = require('express');
 const cors = require('cors');
-const fetch = require('node-fetch'); // ✅ CommonJS: use node-fetch@2
+const fetch = require('node-fetch'); // CommonJS: garanta node-fetch@2
 const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+// ENV
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const TOGETHER_API_KEY = process.env.TOGETHER_API_KEY;
 
@@ -16,22 +16,22 @@ app.use(express.json({ limit: '20mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 const FONT_PAIRS = {
-  barbershop:   { heading: 'Bebas Neue',         body: 'Inter',           url: 'Bebas+Neue|Inter:wght@400;500;600' },
-  restaurant:   { heading: 'Cormorant Garamond', body: 'Nunito',          url: 'Cormorant+Garamond:wght@600;700|Nunito:wght@400;600' },
-  law:          { heading: 'Playfair Display',   body: 'Lato',            url: 'Playfair+Display:wght@600;700;800|Lato:wght@400;700' },
-  tech:         { heading: 'Space Grotesk',      body: 'DM Sans',         url: 'Space+Grotesk:wght@600;700|DM+Sans:wght@400;500' },
-  beauty:       { heading: 'Bodoni Moda',        body: 'Jost',            url: 'Bodoni+Moda:wght@600;700|Jost:wght@400;500' },
-  fitness:      { heading: 'Barlow Condensed',   body: 'Barlow',          url: 'Barlow+Condensed:wght@700;800|Barlow:wght@400;500' },
-  medical:      { heading: 'Merriweather',       body: 'Source Sans 3',   url: 'Merriweather:wght@700|Source+Sans+3:wght@400;600' },
-  realestate:   { heading: 'Cormorant',          body: 'Raleway',         url: 'Cormorant:wght@600;700|Raleway:wght@400;500;600' },
-  education:    { heading: 'Nunito',             body: 'Open Sans',       url: 'Nunito:wght@700;800|Open+Sans:wght@400;600' },
-  creative:     { heading: 'Syne',               body: 'Manrope',         url: 'Syne:wght@700;800|Manrope:wght@400;500' },
-  hotel:        { heading: 'Libre Baskerville',  body: 'Mulish',          url: 'Libre+Baskerville:wght@700|Mulish:wght@400;500' },
-  automotive:   { heading: 'Rajdhani',           body: 'Roboto',          url: 'Rajdhani:wght@600;700|Roboto:wght@400;500' },
-  food:         { heading: 'Satisfy',            body: 'Lato',            url: 'Satisfy|Lato:wght@400;700' },
-  construction: { heading: 'Oswald',             body: 'Roboto',          url: 'Oswald:wght@600;700|Roboto:wght@400;500' },
-  finance:      { heading: 'Libre Baskerville',  body: 'Source Sans 3',   url: 'Libre+Baskerville:wght@700|Source+Sans+3:wght@400;600' },
-  default:      { heading: 'Plus Jakarta Sans',  body: 'Inter',           url: 'Plus+Jakarta+Sans:wght@600;700;800|Inter:wght@400;500;600' },
+  barbershop: { heading: 'Bebas Neue', body: 'Inter', url: 'Bebas+Neue|Inter:wght@400;500;600' },
+  restaurant: { heading: 'Cormorant Garamond', body: 'Nunito', url: 'Cormorant+Garamond:wght@600;700|Nunito:wght@400;600' },
+  law: { heading: 'Playfair Display', body: 'Lato', url: 'Playfair+Display:wght@600;700;800|Lato:wght@400;700' },
+  tech: { heading: 'Space Grotesk', body: 'DM Sans', url: 'Space+Grotesk:wght@600;700|DM+Sans:wght@400;500' },
+  beauty: { heading: 'Bodoni Moda', body: 'Jost', url: 'Bodoni+Moda:wght@600;700|Jost:wght@400;500' },
+  fitness: { heading: 'Barlow Condensed', body: 'Barlow', url: 'Barlow+Condensed:wght@700;800|Barlow:wght@400;500' },
+  medical: { heading: 'Merriweather', body: 'Source Sans 3', url: 'Merriweather:wght@700|Source+Sans+3:wght@400;600' },
+  realestate: { heading: 'Cormorant', body: 'Raleway', url: 'Cormorant:wght@600;700|Raleway:wght@400;500;600' },
+  education: { heading: 'Nunito', body: 'Open Sans', url: 'Nunito:wght@700;800|Open+Sans:wght@400;600' },
+  creative: { heading: 'Syne', body: 'Manrope', url: 'Syne:wght@700;800|Manrope:wght@400;500' },
+  hotel: { heading: 'Libre Baskerville', body: 'Mulish', url: 'Libre+Baskerville:wght@700|Mulish:wght@400;500' },
+  automotive: { heading: 'Rajdhani', body: 'Roboto', url: 'Rajdhani:wght@600;700|Roboto:wght@400;500' },
+  food: { heading: 'Satisfy', body: 'Lato', url: 'Satisfy|Lato:wght@400;700' },
+  construction: { heading: 'Oswald', body: 'Roboto', url: 'Oswald:wght@600;700|Roboto:wght@400;500' },
+  finance: { heading: 'Libre Baskerville', body: 'Source Sans 3', url: 'Libre+Baskerville:wght@700|Source+Sans+3:wght@400;600' },
+  default: { heading: 'Plus Jakarta Sans', body: 'Inter', url: 'Plus+Jakarta+Sans:wght@600;700;800|Inter:wght@400;500;600' },
 };
 
 function sanitizeCode(code) {
@@ -66,7 +66,75 @@ function sanitizeCode(code) {
   return code;
 }
 
-// ─── TOGETHER IMAGE (SD3) ───────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// OpenRouter (GPT-4o)
+// ─────────────────────────────────────────────────────────────────────────────
+async function callOpenRouterText(prompt, opts) {
+  if (!OPENROUTER_API_KEY) throw new Error('Missing OPENROUTER_API_KEY');
+
+  const model = (opts && opts.model) || 'openai/gpt-4o';
+
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + OPENROUTER_API_KEY,
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: (opts && opts.max_tokens) || 16000,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error('OpenRouter error ' + response.status + ': ' + errText);
+  }
+
+  const data = await response.json();
+  return sanitizeCode(data.choices[0].message.content);
+}
+
+async function callOpenRouterVision(base64, mediaType, prompt, opts) {
+  if (!OPENROUTER_API_KEY) throw new Error('Missing OPENROUTER_API_KEY');
+
+  const model = (opts && opts.model) || 'openai/gpt-4o';
+  const dataUrl = 'data:' + (mediaType || 'image/png') + ';base64,' + base64;
+
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + OPENROUTER_API_KEY,
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: (opts && opts.max_tokens) || 16000,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: dataUrl } },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error('OpenRouter error ' + response.status + ': ' + errText);
+  }
+
+  const data = await response.json();
+  return sanitizeCode(data.choices[0].message.content);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Together (imagens baratas)
+// ─────────────────────────────────────────────────────────────────────────────
 async function generateTogetherImage(prompt) {
   try {
     if (!TOGETHER_API_KEY) {
@@ -82,7 +150,7 @@ async function generateTogetherImage(prompt) {
       },
       body: JSON.stringify({
         model: 'stabilityai/stable-diffusion-3',
-        prompt: prompt,
+        prompt,
         response_format: 'url',
         width: 1024,
         height: 1024,
@@ -99,13 +167,13 @@ async function generateTogetherImage(prompt) {
 
     const data = await response.json();
 
-    const url = data && data.data && data.data[0] && data.data[0].url ? data.data[0].url : null;
+    const url = data?.data?.[0]?.url;
     if (url && typeof url === 'string' && url.startsWith('http')) {
       console.log('Together image URL OK:', url);
-      return { url: url, alt: prompt };
+      return { url, alt: prompt };
     }
 
-    const b64 = data && data.data && data.data[0] && data.data[0].b64_json ? data.data[0].b64_json : null;
+    const b64 = data?.data?.[0]?.b64_json;
     if (b64 && typeof b64 === 'string') {
       console.log('Together image base64 OK (data URI)');
       return { url: 'data:image/jpeg;base64,' + b64, alt: prompt };
@@ -123,32 +191,39 @@ async function getImagesForPrompt(userPrompt) {
   try {
     if (!TOGETHER_API_KEY) return null;
 
-    const promptGeneration =
-      'Based on this website request: "' +
+    // GPT-4o cria 4 prompts
+    const promptGen =
+      'Create 4 specific English image prompts for AI image generation for this website request:\n' +
+      '"' +
       userPrompt +
-      '", generate 4 specific English image prompts for AI image generation. Each prompt should describe a professional, high-quality photo relevant to this business. Return ONLY a JSON array of 4 strings, nothing else.';
-
-    const raw = await callOpenRouter(promptGeneration);
-    const clean = (raw || '').replace(/```json|```/g, '').trim();
+      '"\n\n' +
+      'Rules:\n' +
+      '- Return ONLY a JSON array of 4 strings.\n' +
+      '- Prompts must be professional, high-end, ultra realistic photography.\n' +
+      '- Avoid logos/text in the image.\n' +
+      '- Suitable for a premium website hero + sections.\n';
 
     let prompts;
     try {
+      const raw = await callOpenRouterText(promptGen, { model: 'openai/gpt-4o', max_tokens: 1200 });
+      const clean = raw.replace(/```json|```/g, '').trim();
       prompts = JSON.parse(clean);
     } catch (e) {
       const topic = (userPrompt || '').slice(0, 60);
       prompts = [
-        'professional ' + topic + ' interior photography, high-end, cinematic lighting, ultra realistic',
-        topic + ' service close up, premium, shallow depth of field, ultra realistic',
-        topic + ' team working, corporate, premium office, ultra realistic',
-        topic + ' luxury detail shot, elegant, professional photography, ultra realistic',
+        'premium corporate interior for ' + topic + ', ultra realistic photo, cinematic lighting',
+        'professional team at work for ' + topic + ', ultra realistic photo, shallow depth of field',
+        'close-up hands reviewing documents for ' + topic + ', ultra realistic photo, premium desk',
+        'modern reception or exterior establishing shot for ' + topic + ', ultra realistic photo',
       ];
     }
 
-    console.log('Together: generating', prompts.length, 'images...');
-    const results = await Promise.all(prompts.slice(0, 4).map(function (p) { return generateTogetherImage(p); }));
+    console.log('Together: generating images with prompts:', prompts);
+
+    const results = await Promise.all(prompts.slice(0, 4).map(generateTogetherImage));
     const images = results.filter(Boolean);
 
-    console.log('Together: generated', images.length, 'of', prompts.length);
+    console.log('Together: generated', images.length, 'images');
     return images.length > 0 ? images : null;
   } catch (err) {
     console.error('getImagesForPrompt error:', err.message);
@@ -156,6 +231,9 @@ async function getImagesForPrompt(userPrompt) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Project files
+// ─────────────────────────────────────────────────────────────────────────────
 function getBaseFiles(appCode) {
   return {
     'package.json': JSON.stringify(
@@ -243,13 +321,13 @@ function buildPrompt(userRequest, currentAppCode, images) {
     'Use only ASCII characters in strings and JSX text',
     'ALL strings must be properly closed',
     'ALL JSX tags must be properly closed',
-    'NEVER use unsplash.com, picsum.photos, via.placeholder.com or ANY external image provider unless it is exactly one of the provided IMAGE_URL constants',
+    'NEVER use unsplash.com, picsum.photos, via.placeholder.com, or any random image URL',
   ].join('\n- ');
 
   if (isModify) {
     return [
       'You are a senior React + TypeScript + Tailwind CSS expert.',
-      'You are EDITING an existing App.tsx. Make ONLY the requested change.',
+      'You are EDITING an existing project. Make ONLY the requested change. Keep the rest intact.',
       'RULES:\n- ' + rules,
       '=== CURRENT App.tsx ===',
       currentAppCode,
@@ -262,6 +340,10 @@ function buildPrompt(userRequest, currentAppCode, images) {
   const p2 = (userRequest || '').toLowerCase();
   let fonts = FONT_PAIRS.default;
   if (/advogad|juridic|law|legal/.test(p2)) fonts = FONT_PAIRS.law;
+  else if (/barber|barbearia|haircut/.test(p2)) fonts = FONT_PAIRS.barbershop;
+  else if (/restauran|food|comida|cafe|pizza/.test(p2)) fonts = FONT_PAIRS.restaurant;
+  else if (/tech|software|startup|saas/.test(p2)) fonts = FONT_PAIRS.tech;
+  else if (/pilates|yoga|estetica|beleza|spa/.test(p2)) fonts = FONT_PAIRS.beauty;
 
   const fontInstruction = [
     'FONTS: Load these Google Fonts in a useEffect by injecting a <link> tag:',
@@ -273,117 +355,36 @@ function buildPrompt(userRequest, currentAppCode, images) {
   const imageInstruction =
     images && images.length > 0
       ? [
-          'IMAGES: You MUST define these constants at the top and use them for ALL <img> tags.',
-          images.map(function (img, i) { return 'const IMAGE_' + (i + 1) + '_URL = "' + img.url + '";'; }).join('\n'),
-          'CRITICAL: Use IMAGE_1_URL as hero background image. Use IMAGE_2_URL..IMAGE_4_URL across cards/sections.',
-          'FORBIDDEN: Do NOT use any other image URLs.',
+          'IMAGES: Use ONLY these URLs. Define constants and use them in <img src={...}>.',
+          images.map((img, i) => `const IMAGE_${i + 1}_URL = "${img.url}";`).join('\n'),
+          'Use IMAGE_1_URL as hero background image (img + overlay).',
+          'Use IMAGE_2_URL..IMAGE_4_URL across services/gallery/team sections.',
+          'FORBIDDEN: Do not use any other image URL.',
         ].join('\n')
       : [
-          'IMAGES: None provided. Do NOT use any external image URLs. Use gradient div blocks instead of images.',
+          'IMAGES: No images provided. Do not use external image URLs.',
+          'Use gradient divs instead of images.',
         ].join('\n');
 
   return [
     'You are a world-class UI/UX designer and React developer creating agency-quality websites.',
     fontInstruction,
     imageInstruction,
+    'DESIGN REQUIREMENTS:',
+    '- Premium hero, strong typography, elegant spacing',
+    '- Sections: Services, About, Team, Contact',
+    '- Buttons with hover transitions',
     'RULES:\n- ' + rules,
     'Create a stunning, agency-quality React app for: ' + userRequest,
     'Return only App.tsx:',
   ].join('\n\n');
 }
 
-function appUsesAllImageUrls(appCode, images) {
-  if (!images || images.length === 0) return true;
-  const c = appCode || '';
-  // garante pelo menos 2 URLs presentes (hero + mais 1)
-  let hit = 0;
-  for (let i = 0; i < images.length; i++) {
-    if (images[i] && images[i].url && c.includes(images[i].url)) hit++;
-  }
-  return hit >= Math.min(2, images.length);
-}
-
-async function forceFixImages(appCode, images) {
-  // Segunda passada: "você esqueceu de usar as URLs"
-  const fixPrompt = [
-    'You are a senior React + TypeScript + Tailwind CSS expert.',
-    'TASK: The code below does NOT use the required image URLs. Fix it.',
-    'RULES:',
-    '- Return ONLY raw TSX (no markdown).',
-    '- Keep design/layout/text the same as much as possible.',
-    '- Replace ALL <img src="..."> to use the provided URLs.',
-    '- FORBIDDEN: Do not use any other image URL.',
-    '',
-    'REQUIRED IMAGE URLS:',
-    images.map(function (img, i) { return 'IMAGE_' + (i + 1) + '_URL=' + img.url; }).join('\n'),
-    '',
-    '=== CURRENT App.tsx ===',
-    appCode,
-    '=== END ===',
-    '',
-    'Return the corrected App.tsx now:',
-  ].join('\n');
-
-  return callOpenRouter(fixPrompt);
-}
-
-async function callOpenRouter(prompt) {
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: 'Bearer ' + OPENROUTER_API_KEY,
-    },
-    body: JSON.stringify({
-      model: 'anthropic/claude-sonnet-4-5',
-      max_tokens: 16000,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error('OpenRouter error ' + response.status + ': ' + errText);
-  }
-
-  const data = await response.json();
-  return sanitizeCode(data.choices[0].message.content);
-}
-
-async function callAnthropicVision(image, mediaType, prompt) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 16000,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: image } },
-            { type: 'text', text: prompt },
-          ],
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error('Anthropic error ' + response.status + ': ' + errText);
-  }
-
-  const data = await response.json();
-  return sanitizeCode(data.content[0].text);
-}
-
+// ─────────────────────────────────────────────────────────────────────────────
+// Routes
+// ─────────────────────────────────────────────────────────────────────────────
 app.post('/api/generate', async (req, res) => {
-  const { prompt, currentAppCode } = req.body;
+  const { prompt, currentAppCode, chatHistory } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt required' });
 
   try {
@@ -392,16 +393,14 @@ app.post('/api/generate', async (req, res) => {
     if (!currentAppCode) {
       console.log('Generating Together images for:', prompt);
       images = await getImagesForPrompt(prompt);
-      console.log('Together images:', images ? images.length : 0);
+      console.log('Images result:', images ? images.length + ' images' : 'no images');
     }
 
-    let appCode = await callOpenRouter(buildPrompt(prompt, currentAppCode, images));
-
-    // ✅ Garantia: se imagens existem mas TSX nao usa, roda fix
-    if (images && images.length > 0 && !appUsesAllImageUrls(appCode, images)) {
-      console.log('App.tsx did not include required image URLs. Running fix pass...');
-      appCode = await forceFixImages(appCode, images);
-    }
+    // GPT-4o gera o App.tsx
+    const appCode = await callOpenRouterText(buildPrompt(prompt, currentAppCode, images), {
+      model: 'openai/gpt-4o',
+      max_tokens: 16000,
+    });
 
     const files = getBaseFiles(appCode);
     res.json({ files, appCode, images });
@@ -411,20 +410,31 @@ app.post('/api/generate', async (req, res) => {
   }
 });
 
+// Recriar UI a partir de imagem (GPT-4o vision via OpenRouter)
 app.post('/api/image', async (req, res) => {
   const { image, mediaType, prompt } = req.body;
   if (!image) return res.status(400).json({ error: 'Image required' });
-  if (!ANTHROPIC_API_KEY) return res.status(400).json({ error: 'Missing ANTHROPIC_API_KEY' });
 
   const visionPrompt = [
     'You are a senior React + TypeScript + Tailwind CSS expert.',
     'Analyze this design and recreate it as a React component.',
     prompt ? 'Additional instructions: ' + prompt : '',
-    'RULES: Return ONLY raw TSX. Use Tailwind. Start with import React.',
+    '',
+    'RULES:',
+    '- Return ONLY raw TSX code, no markdown fences',
+    '- Start with: import React from "react"',
+    '- Export: export default function App()',
+    '- Use Tailwind CSS only',
+    '- Use lucide-react for icons if needed',
+    '- ASCII characters only in strings',
+    '- Be faithful to the colors, layout and style of the image',
   ].join('\n');
 
   try {
-    const appCode = await callAnthropicVision(image, mediaType || 'image/png', visionPrompt);
+    const appCode = await callOpenRouterVision(image, mediaType || 'image/png', visionPrompt, {
+      model: 'openai/gpt-4o',
+      max_tokens: 16000,
+    });
     const files = getBaseFiles(appCode);
     res.json({ files, appCode });
   } catch (err) {
@@ -433,6 +443,7 @@ app.post('/api/image', async (req, res) => {
   }
 });
 
+// HTML helper
 app.post('/api/chat', async (req, res) => {
   const { prompt, code } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt required' });
@@ -442,7 +453,7 @@ app.post('/api/chat', async (req, res) => {
     (code ? 'Current code:\n' + code + '\n\nRequest: ' + prompt : prompt);
 
   try {
-    const result = await callOpenRouter(fullPrompt);
+    const result = await callOpenRouterText(fullPrompt, { model: 'openai/gpt-4o', max_tokens: 8000 });
     res.json({ result: (result || '').replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim() });
   } catch (err) {
     console.error('/api/chat error:', err.message);
