@@ -1,7 +1,7 @@
 // server.js
 const express = require('express');
 const cors = require('cors');
-const fetch = require('node-fetch'); // ✅ CommonJS: garanta node-fetch@2
+const fetch = require('node-fetch'); // ✅ CommonJS: use node-fetch@2
 const path = require('path');
 
 const app = express();
@@ -37,20 +37,20 @@ const FONT_PAIRS = {
 function sanitizeCode(code) {
   code = (code || '').trim();
 
-  // Remove ALL markdown code fences anywhere in the code
+  // remove fences
   code = code.replace(/^```[a-zA-Z]*\r?\n/gm, '');
   code = code.replace(/^```\r?$/gm, '');
   code = code.replace(/```[a-zA-Z]*\n/g, '');
   code = code.replace(/```/g, '');
   code = code.trim();
 
-  // Fix smart quotes and special characters
+  // smart quotes
   code = code.replace(/\u201C/g, '"').replace(/\u201D/g, '"');
   code = code.replace(/\u2018/g, "'").replace(/\u2019/g, "'");
   code = code.replace(/\u2013/g, '-').replace(/\u2014/g, '-');
   code = code.replace(/\u00A0/g, ' ');
 
-  // Remove duplicate import React statements - keep only the first one
+  // dedupe import React
   let reactImportFound = false;
   code = code
     .split('\n')
@@ -66,11 +66,11 @@ function sanitizeCode(code) {
   return code;
 }
 
-// ─── TOGETHER AI IMAGE GENERATION (Stable Diffusion 3) ───────────────────────
+// ─── TOGETHER IMAGE (SD3) ───────────────────────────────────────────────────
 async function generateTogetherImage(prompt) {
   try {
     if (!TOGETHER_API_KEY) {
-      console.error('Missing TOGETHER_API_KEY (set it in Railway/Env)');
+      console.error('Missing TOGETHER_API_KEY');
       return null;
     }
 
@@ -81,12 +81,9 @@ async function generateTogetherImage(prompt) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'stabilityai/stable-diffusion-3', // ✅ barato e bom
+        model: 'stabilityai/stable-diffusion-3',
         prompt: prompt,
-
-        // ✅ força retorno em URL (mas mantemos fallback base64)
         response_format: 'url',
-
         width: 1024,
         height: 1024,
         steps: 30,
@@ -96,44 +93,40 @@ async function generateTogetherImage(prompt) {
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error('Together AI error status:', response.status, errText);
+      console.error('Together error:', response.status, errText);
       return null;
     }
 
     const data = await response.json();
 
-    // 1) URL (preferido)
     const url = data && data.data && data.data[0] && data.data[0].url ? data.data[0].url : null;
     if (url && typeof url === 'string' && url.startsWith('http')) {
       console.log('Together image URL OK:', url);
       return { url: url, alt: prompt };
     }
 
-    // 2) Fallback: base64
     const b64 = data && data.data && data.data[0] && data.data[0].b64_json ? data.data[0].b64_json : null;
     if (b64 && typeof b64 === 'string') {
-      const dataUri = 'data:image/jpeg;base64,' + b64;
       console.log('Together image base64 OK (data URI)');
-      return { url: dataUri, alt: prompt };
+      return { url: 'data:image/jpeg;base64,' + b64, alt: prompt };
     }
 
-    console.error('Together AI unexpected response:', JSON.stringify(data));
+    console.error('Together unexpected response:', JSON.stringify(data));
     return null;
   } catch (err) {
-    console.error('Together AI fetch error:', err.message);
+    console.error('Together fetch error:', err.message);
     return null;
   }
 }
 
 async function getImagesForPrompt(userPrompt) {
   try {
-    // Se não tiver chave, nem tenta gerar (site ainda sai com gradientes)
     if (!TOGETHER_API_KEY) return null;
 
     const promptGeneration =
       'Based on this website request: "' +
       userPrompt +
-      '", generate 4 specific English image prompts for AI image generation. Each prompt should describe a professional, high-quality photo relevant to this business. Return ONLY a JSON array of 4 strings, nothing else. Example: ["professional barbershop interior with leather chairs", "barber cutting hair close up", "razor and grooming tools on marble", "stylish man after haircut"]';
+      '", generate 4 specific English image prompts for AI image generation. Each prompt should describe a professional, high-quality photo relevant to this business. Return ONLY a JSON array of 4 strings, nothing else.';
 
     const raw = await callOpenRouter(promptGeneration);
     const clean = (raw || '').replace(/```json|```/g, '').trim();
@@ -142,22 +135,20 @@ async function getImagesForPrompt(userPrompt) {
     try {
       prompts = JSON.parse(clean);
     } catch (e) {
-      const topic = (userPrompt || '').slice(0, 50);
+      const topic = (userPrompt || '').slice(0, 60);
       prompts = [
-        'professional ' + topic + ' interior photography',
-        topic + ' service close up professional photo',
-        topic + ' team working professional',
-        topic + ' product or space elegant photography',
+        'professional ' + topic + ' interior photography, high-end, cinematic lighting, ultra realistic',
+        topic + ' service close up, premium, shallow depth of field, ultra realistic',
+        topic + ' team working, corporate, premium office, ultra realistic',
+        topic + ' luxury detail shot, elegant, professional photography, ultra realistic',
       ];
     }
 
-    console.log('Generating', prompts.length, 'images with Together AI...');
-    console.log('Image prompts:', prompts);
-
+    console.log('Together: generating', prompts.length, 'images...');
     const results = await Promise.all(prompts.slice(0, 4).map(function (p) { return generateTogetherImage(p); }));
-    const images = results.filter(function (r) { return r !== null; });
+    const images = results.filter(Boolean);
 
-    console.log('Together AI: Generated', images.length, 'of', prompts.length, 'images successfully');
+    console.log('Together: generated', images.length, 'of', prompts.length);
     return images.length > 0 ? images : null;
   } catch (err) {
     console.error('getImagesForPrompt error:', err.message);
@@ -239,7 +230,7 @@ function getBaseFiles(appCode) {
   };
 }
 
-function buildPrompt(userRequest, currentAppCode, chatHistory, images) {
+function buildPrompt(userRequest, currentAppCode, images) {
   const isModify = !!currentAppCode;
 
   const rules = [
@@ -252,108 +243,88 @@ function buildPrompt(userRequest, currentAppCode, chatHistory, images) {
     'Use only ASCII characters in strings and JSX text',
     'ALL strings must be properly closed',
     'ALL JSX tags must be properly closed',
-    'NEVER use inline style with CSS grid - use Tailwind grid-cols-* classes instead',
-    'NEVER use style={{ gridTemplateColumns: ... }} anywhere - forbidden',
-    'NEVER use window.innerWidth inside JSX or style props - use Tailwind responsive prefixes (sm: md: lg:) instead',
-    'For responsive layouts use Tailwind: className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3"',
-    'For responsive visibility use Tailwind: className="hidden md:flex" or className="flex md:hidden"',
-    'Count every opening { and make sure it has a matching closing }',
-    'Count every opening ( and make sure it has a matching closing )',
+    'NEVER use unsplash.com, picsum.photos, via.placeholder.com or ANY external image provider unless it is exactly one of the provided IMAGE_URL constants',
   ].join('\n- ');
 
   if (isModify) {
     return [
       'You are a senior React + TypeScript + Tailwind CSS expert.',
-      '',
-      '!!! IMPORTANT: You are EDITING an existing project. DO NOT create a new project from scratch.',
-      'Make ONLY the requested change. Keep all structure, content and style intact.',
-      '',
+      'You are EDITING an existing App.tsx. Make ONLY the requested change.',
       'RULES:\n- ' + rules,
-      '',
       '=== CURRENT App.tsx ===',
       currentAppCode,
       '=== END ===',
-      '',
       'USER REQUEST: ' + userRequest,
-      '',
       'Return the complete modified App.tsx:',
     ].join('\n');
   }
 
   const p2 = (userRequest || '').toLowerCase();
   let fonts = FONT_PAIRS.default;
-  if (/barber|barbearia|haircut/.test(p2)) fonts = FONT_PAIRS.barbershop;
-  else if (/restauran|food|comida|cafe|pizza/.test(p2)) fonts = FONT_PAIRS.restaurant;
-  else if (/advogad|juridic|law|legal/.test(p2)) fonts = FONT_PAIRS.law;
-  else if (/tech|software|startup|saas/.test(p2)) fonts = FONT_PAIRS.tech;
-  else if (/pilates|yoga|estetica|beleza|spa/.test(p2)) fonts = FONT_PAIRS.beauty;
-  else if (/academia|gym|fitness|treino/.test(p2)) fonts = FONT_PAIRS.fitness;
-  else if (/medic|clinic|saude|dental/.test(p2)) fonts = FONT_PAIRS.medical;
-  else if (/imovel|imobiliaria|casa/.test(p2)) fonts = FONT_PAIRS.realestate;
-  else if (/hotel|pousada|resort/.test(p2)) fonts = FONT_PAIRS.hotel;
-  else if (/constru|arquitet|engenhei/.test(p2)) fonts = FONT_PAIRS.construction;
-  else if (/financ|contabil|investiment/.test(p2)) fonts = FONT_PAIRS.finance;
-  else if (/carro|auto|oficina|mecanica/.test(p2)) fonts = FONT_PAIRS.automotive;
+  if (/advogad|juridic|law|legal/.test(p2)) fonts = FONT_PAIRS.law;
 
   const fontInstruction = [
     'FONTS: Load these Google Fonts in a useEffect by injecting a <link> tag:',
-    '  URL: https://fonts.googleapis.com/css2?family=' + fonts.url + '&display=swap',
-    '  Heading font: "' +
-      fonts.heading +
-      "\" - use with style={{fontFamily: '\"" +
-      fonts.heading +
-      "\", serif'}} on all headings",
-    '  Body font: "' + fonts.body + '" - inject on document.body style',
+    'URL: https://fonts.googleapis.com/css2?family=' + fonts.url + '&display=swap',
+    'Heading font: "' + fonts.heading + '"',
+    'Body font: "' + fonts.body + '"',
   ].join('\n');
 
   const imageInstruction =
     images && images.length > 0
       ? [
-          '!!! IMAGES - READ CAREFULLY !!!',
-          'You have ' + images.length + ' AI-generated image URLs. You MUST use ALL of them exactly as provided.',
-          'Copy each URL character by character into your <img src=""> tags. DO NOT modify them.',
-          images.map(function (img, i) { return 'IMAGE_' + (i + 1) + '_URL=' + img.url; }).join('\n'),
-          'Usage rules:',
-          '- IMAGE_1_URL: hero section background (use as src in <img> with object-cover, plus a dark overlay for readability)',
-          '- IMAGE_2_URL: about/gallery section',
-          '- IMAGE_3_URL: services or team section',
-          '- IMAGE_4_URL: another section or gallery',
-          'CRITICAL: Copy the URLs EXACTLY. Do not add, remove or change any character.',
-          'FORBIDDEN: Do NOT use unsplash.com, picsum, placeholder, or any other image source.',
-          'Always use loading="lazy" on non-hero images.',
+          'IMAGES: You MUST define these constants at the top and use them for ALL <img> tags.',
+          images.map(function (img, i) { return 'const IMAGE_' + (i + 1) + '_URL = "' + img.url + '";'; }).join('\n'),
+          'CRITICAL: Use IMAGE_1_URL as hero background image. Use IMAGE_2_URL..IMAGE_4_URL across cards/sections.',
+          'FORBIDDEN: Do NOT use any other image URLs.',
         ].join('\n')
       : [
-          'IMAGES: No images provided.',
-          'FORBIDDEN: Do NOT use unsplash.com, picsum.photos, placeholder.com, or invent ANY image URLs.',
-          'Use CSS gradient divs instead of images: <div className="w-full h-64 bg-gradient-to-br from-gray-700 to-gray-900 rounded-xl" />',
+          'IMAGES: None provided. Do NOT use any external image URLs. Use gradient div blocks instead of images.',
         ].join('\n');
 
   return [
     'You are a world-class UI/UX designer and React developer creating agency-quality websites.',
-    '',
     fontInstruction,
-    '',
     imageInstruction,
-    '',
-    'DESIGN REQUIREMENTS:',
-    '- Hero: full-screen with real background image (overlay gradient for text readability), massive typography',
-    '- Sections: alternate bg colors, generous spacing (py-24), smooth hover transitions',
-    '- Cards: hover:scale-105 hover:shadow-2xl hover:-translate-y-2 transition-all duration-300',
-    '- Stats: text-5xl font-black, make them visually impactful',
-    '- Avatars: colored gradient circles with initials, never empty boxes',
-    '- Buttons: solid primary + outlined secondary with hover states',
-    '- Add subtle section dividers and decorative elements',
-    '',
-    'CRITICAL BUGS TO AVOID:',
-    '- Images: ALWAYS use the exact AI-generated image URLs provided above - NEVER invent or search for image URLs',
-    '- NEVER use unsplash.com, images.unsplash.com, picsum.photos, via.placeholder.com, or ANY external image source',
-    '- NEVER make up image URLs - if no images are provided, use CSS gradient divs instead',
-    '',
     'RULES:\n- ' + rules,
-    '',
     'Create a stunning, agency-quality React app for: ' + userRequest,
     'Return only App.tsx:',
+  ].join('\n\n');
+}
+
+function appUsesAllImageUrls(appCode, images) {
+  if (!images || images.length === 0) return true;
+  const c = appCode || '';
+  // garante pelo menos 2 URLs presentes (hero + mais 1)
+  let hit = 0;
+  for (let i = 0; i < images.length; i++) {
+    if (images[i] && images[i].url && c.includes(images[i].url)) hit++;
+  }
+  return hit >= Math.min(2, images.length);
+}
+
+async function forceFixImages(appCode, images) {
+  // Segunda passada: "você esqueceu de usar as URLs"
+  const fixPrompt = [
+    'You are a senior React + TypeScript + Tailwind CSS expert.',
+    'TASK: The code below does NOT use the required image URLs. Fix it.',
+    'RULES:',
+    '- Return ONLY raw TSX (no markdown).',
+    '- Keep design/layout/text the same as much as possible.',
+    '- Replace ALL <img src="..."> to use the provided URLs.',
+    '- FORBIDDEN: Do not use any other image URL.',
+    '',
+    'REQUIRED IMAGE URLS:',
+    images.map(function (img, i) { return 'IMAGE_' + (i + 1) + '_URL=' + img.url; }).join('\n'),
+    '',
+    '=== CURRENT App.tsx ===',
+    appCode,
+    '=== END ===',
+    '',
+    'Return the corrected App.tsx now:',
   ].join('\n');
+
+  return callOpenRouter(fixPrompt);
 }
 
 async function callOpenRouter(prompt) {
@@ -371,8 +342,8 @@ async function callOpenRouter(prompt) {
   });
 
   if (!response.ok) {
-    const err = await response.json().catch(function () { return null; });
-    throw new Error(err && err.error && err.error.message ? err.error.message : 'OpenRouter error ' + response.status);
+    const errText = await response.text();
+    throw new Error('OpenRouter error ' + response.status + ': ' + errText);
   }
 
   const data = await response.json();
@@ -403,8 +374,8 @@ async function callAnthropicVision(image, mediaType, prompt) {
   });
 
   if (!response.ok) {
-    const err = await response.json().catch(function () { return null; });
-    throw new Error(err && err.error && err.error.message ? err.error.message : 'Anthropic error ' + response.status);
+    const errText = await response.text();
+    throw new Error('Anthropic error ' + response.status + ': ' + errText);
   }
 
   const data = await response.json();
@@ -412,22 +383,27 @@ async function callAnthropicVision(image, mediaType, prompt) {
 }
 
 app.post('/api/generate', async (req, res) => {
-  const { prompt, currentAppCode, chatHistory } = req.body;
+  const { prompt, currentAppCode } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt required' });
 
   try {
     let images = null;
 
     if (!currentAppCode) {
-      console.log('Generating Together AI images for:', prompt);
+      console.log('Generating Together images for:', prompt);
       images = await getImagesForPrompt(prompt);
-      console.log('Together AI result:', images ? images.length + ' images' : 'failed, no images');
+      console.log('Together images:', images ? images.length : 0);
     }
 
-    const appCode = await callOpenRouter(buildPrompt(prompt, currentAppCode, chatHistory, images));
-    const files = getBaseFiles(appCode);
+    let appCode = await callOpenRouter(buildPrompt(prompt, currentAppCode, images));
 
-    // images vai junto só pra debug (opcional)
+    // ✅ Garantia: se imagens existem mas TSX nao usa, roda fix
+    if (images && images.length > 0 && !appUsesAllImageUrls(appCode, images)) {
+      console.log('App.tsx did not include required image URLs. Running fix pass...');
+      appCode = await forceFixImages(appCode, images);
+    }
+
+    const files = getBaseFiles(appCode);
     res.json({ files, appCode, images });
   } catch (err) {
     console.error('/api/generate error:', err.message);
@@ -438,27 +414,16 @@ app.post('/api/generate', async (req, res) => {
 app.post('/api/image', async (req, res) => {
   const { image, mediaType, prompt } = req.body;
   if (!image) return res.status(400).json({ error: 'Image required' });
+  if (!ANTHROPIC_API_KEY) return res.status(400).json({ error: 'Missing ANTHROPIC_API_KEY' });
 
   const visionPrompt = [
     'You are a senior React + TypeScript + Tailwind CSS expert.',
     'Analyze this design and recreate it as a React component.',
     prompt ? 'Additional instructions: ' + prompt : '',
-    '',
-    'RULES:',
-    '- Return ONLY raw TSX code, no markdown fences',
-    '- Start with: import React from "react"',
-    '- Export: export default function App()',
-    '- Use Tailwind CSS only',
-    '- Use lucide-react for icons if needed',
-    '- ASCII characters only in strings',
-    '- Be faithful to the colors, layout and style of the image',
+    'RULES: Return ONLY raw TSX. Use Tailwind. Start with import React.',
   ].join('\n');
 
   try {
-    if (!ANTHROPIC_API_KEY) {
-      return res.status(400).json({ error: 'Missing ANTHROPIC_API_KEY' });
-    }
-
     const appCode = await callAnthropicVision(image, mediaType || 'image/png', visionPrompt);
     const files = getBaseFiles(appCode);
     res.json({ files, appCode });
