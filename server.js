@@ -1,6 +1,7 @@
+// server.js
 const express = require('express');
 const cors = require('cors');
-const fetch = require('node-fetch');
+const fetch = require('node-fetch'); // use node-fetch@2 if you're on CommonJS
 const path = require('path');
 
 const app = express();
@@ -8,7 +9,9 @@ const PORT = process.env.PORT || 3000;
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const DEEPAI_API_KEY = process.env.DEEPAI_API_KEY || '2bdebb88-edf3-4aaf-9ed8-1def7cefa235';
+
+// NEW: Together AI key (set this in Railway env vars)
+const TOGETHER_API_KEY = process.env.TOGETHER_API_KEY;
 
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
@@ -16,37 +19,35 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const FONT_PAIRS = {
   barbershop:   { heading: 'Bebas Neue',         body: 'Inter',           url: 'Bebas+Neue|Inter:wght@400;500;600' },
-  restaurant:   { heading: 'Cormorant Garamond',  body: 'Nunito',          url: 'Cormorant+Garamond:wght@600;700|Nunito:wght@400;600' },
-  law:          { heading: 'Playfair Display',    body: 'Lato',            url: 'Playfair+Display:wght@600;700;800|Lato:wght@400;700' },
-  tech:         { heading: 'Space Grotesk',       body: 'DM Sans',         url: 'Space+Grotesk:wght@600;700|DM+Sans:wght@400;500' },
-  beauty:       { heading: 'Bodoni Moda',         body: 'Jost',            url: 'Bodoni+Moda:wght@600;700|Jost:wght@400;500' },
-  fitness:      { heading: 'Barlow Condensed',    body: 'Barlow',          url: 'Barlow+Condensed:wght@700;800|Barlow:wght@400;500' },
-  medical:      { heading: 'Merriweather',        body: 'Source Sans 3',   url: 'Merriweather:wght@700|Source+Sans+3:wght@400;600' },
-  realestate:   { heading: 'Cormorant',           body: 'Raleway',         url: 'Cormorant:wght@600;700|Raleway:wght@400;500;600' },
-  education:    { heading: 'Nunito',              body: 'Open Sans',       url: 'Nunito:wght@700;800|Open+Sans:wght@400;600' },
-  creative:     { heading: 'Syne',                body: 'Manrope',         url: 'Syne:wght@700;800|Manrope:wght@400;500' },
-  hotel:        { heading: 'Libre Baskerville',   body: 'Mulish',          url: 'Libre+Baskerville:wght@700|Mulish:wght@400;500' },
-  automotive:   { heading: 'Rajdhani',            body: 'Roboto',          url: 'Rajdhani:wght@600;700|Roboto:wght@400;500' },
-  food:         { heading: 'Satisfy',             body: 'Lato',            url: 'Satisfy|Lato:wght@400;700' },
-  construction: { heading: 'Oswald',              body: 'Roboto',          url: 'Oswald:wght@600;700|Roboto:wght@400;500' },
-  finance:      { heading: 'Libre Baskerville',   body: 'Source Sans 3',   url: 'Libre+Baskerville:wght@700|Source+Sans+3:wght@400;600' },
-  default:      { heading: 'Plus Jakarta Sans',   body: 'Inter',           url: 'Plus+Jakarta+Sans:wght@600;700;800|Inter:wght@400;500;600' },
+  restaurant:   { heading: 'Cormorant Garamond', body: 'Nunito',          url: 'Cormorant+Garamond:wght@600;700|Nunito:wght@400;600' },
+  law:          { heading: 'Playfair Display',   body: 'Lato',            url: 'Playfair+Display:wght@600;700;800|Lato:wght@400;700' },
+  tech:         { heading: 'Space Grotesk',      body: 'DM Sans',         url: 'Space+Grotesk:wght@600;700|DM+Sans:wght@400;500' },
+  beauty:       { heading: 'Bodoni Moda',        body: 'Jost',            url: 'Bodoni+Moda:wght@600;700|Jost:wght@400;500' },
+  fitness:      { heading: 'Barlow Condensed',   body: 'Barlow',          url: 'Barlow+Condensed:wght@700;800|Barlow:wght@400;500' },
+  medical:      { heading: 'Merriweather',       body: 'Source Sans 3',   url: 'Merriweather:wght@700|Source+Sans+3:wght@400;600' },
+  realestate:   { heading: 'Cormorant',          body: 'Raleway',         url: 'Cormorant:wght@600;700|Raleway:wght@400;500;600' },
+  education:    { heading: 'Nunito',             body: 'Open Sans',       url: 'Nunito:wght@700;800|Open+Sans:wght@400;600' },
+  creative:     { heading: 'Syne',               body: 'Manrope',         url: 'Syne:wght@700;800|Manrope:wght@400;500' },
+  hotel:        { heading: 'Libre Baskerville',  body: 'Mulish',          url: 'Libre+Baskerville:wght@700|Mulish:wght@400;500' },
+  automotive:   { heading: 'Rajdhani',           body: 'Roboto',          url: 'Rajdhani:wght@600;700|Roboto:wght@400;500' },
+  food:         { heading: 'Satisfy',            body: 'Lato',            url: 'Satisfy|Lato:wght@400;700' },
+  construction: { heading: 'Oswald',             body: 'Roboto',          url: 'Oswald:wght@600;700|Roboto:wght@400;500' },
+  finance:      { heading: 'Libre Baskerville',  body: 'Source Sans 3',   url: 'Libre+Baskerville:wght@700|Source+Sans+3:wght@400;600' },
+  default:      { heading: 'Plus Jakarta Sans',  body: 'Inter',           url: 'Plus+Jakarta+Sans:wght@600;700;800|Inter:wght@400;500;600' },
 };
 
 function sanitizeCode(code) {
-  code = code.trim();
-  // Remove ALL markdown code fences anywhere in the code
+  code = (code || '').trim();
   code = code.replace(/^```[a-zA-Z]*\r?\n/gm, '');
   code = code.replace(/^```\r?$/gm, '');
   code = code.replace(/```[a-zA-Z]*\n/g, '');
   code = code.replace(/```/g, '');
   code = code.trim();
-  // Fix smart quotes and special characters
   code = code.replace(/\u201C/g, '"').replace(/\u201D/g, '"');
   code = code.replace(/\u2018/g, "'").replace(/\u2019/g, "'");
   code = code.replace(/\u2013/g, '-').replace(/\u2014/g, '-');
   code = code.replace(/\u00A0/g, ' ');
-  // Remove duplicate import React statements - keep only the first one
+
   let reactImportFound = false;
   code = code.split('\n').filter(function(line) {
     if (/^import React/.test(line.trim())) {
@@ -55,55 +56,75 @@ function sanitizeCode(code) {
     }
     return true;
   }).join('\n');
+
   return code;
 }
 
-// ─── DEEPAI IMAGE GENERATION ─────────────────────────────────────────────────
-async function generateDeepAIImage(prompt) {
+// ─── TOGETHER AI IMAGE GENERATION ────────────────────────────────────────────
+async function generateTogetherImage(prompt) {
   try {
-    // Use URLSearchParams - works reliably with node-fetch without extra dependencies
-    const params = new URLSearchParams();
-    params.append('text', prompt);
+    if (!TOGETHER_API_KEY) {
+      console.error('Missing TOGETHER_API_KEY (set it in your Railway environment variables)');
+      return null;
+    }
 
-    const response = await fetch('https://api.deepai.org/api/text2img', {
+    const response = await fetch('https://api.together.xyz/v1/images/generations', {
       method: 'POST',
       headers: {
-        'api-key': DEEPAI_API_KEY,
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Authorization': 'Bearer ' + TOGETHER_API_KEY,
+        'Content-Type': 'application/json'
       },
-      body: params.toString()
+      body: JSON.stringify({
+        model: 'ideogram/ideogram-3.0',
+        prompt: prompt,
+        // You can tweak size if you want:
+        width: 1024,
+        height: 1024
+      })
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error('DeepAI error status:', response.status, errText);
+      console.error('Together AI error status:', response.status, errText);
       return null;
     }
 
     const data = await response.json();
-    if (data.output_url && data.output_url.startsWith('http')) {
-      console.log('DeepAI image generated OK:', data.output_url);
-      return { url: data.output_url, alt: prompt };
+
+    // Typical Together format: { data: [{ url: "..." }, ...] }
+    const url =
+      data && data.data && Array.isArray(data.data) && data.data[0] && data.data[0].url
+        ? data.data[0].url
+        : null;
+
+    if (url && typeof url === 'string' && url.startsWith('http')) {
+      console.log('Together AI image generated OK:', url);
+      return { url: url, alt: prompt };
     }
-    console.error('DeepAI no output_url in response:', JSON.stringify(data));
+
+    console.error('Together AI unexpected response:', JSON.stringify(data));
     return null;
   } catch (err) {
-    console.error('DeepAI fetch error:', err.message);
+    console.error('Together AI fetch error:', err.message);
     return null;
   }
 }
 
 async function getImagesForPrompt(userPrompt) {
   try {
-    const promptGeneration = 'Based on this website request: "' + userPrompt + '", generate 4 specific English image prompts for AI image generation. Each prompt should describe a professional, high-quality photo relevant to this business. Return ONLY a JSON array of 4 strings, nothing else. Example: ["professional barbershop interior with leather chairs", "barber cutting hair close up", "razor and grooming tools on marble", "stylish man after haircut"]';
+    const promptGeneration =
+      'Based on this website request: "' + userPrompt + '", generate 4 specific English image prompts for AI image generation. ' +
+      'Each prompt should describe a professional, high-quality photo relevant to this business. ' +
+      'Return ONLY a JSON array of 4 strings, nothing else. Example: ["professional barbershop interior with leather chairs", "barber cutting hair close up", "razor and grooming tools on marble", "stylish man after haircut"]';
 
     const raw = await callOpenRouter(promptGeneration);
-    const clean = raw.replace(/```json|```/g, '').trim();
+    const clean = (raw || '').replace(/```json|```/g, '').trim();
+
     let prompts;
     try {
       prompts = JSON.parse(clean);
-    } catch(e) {
-      const topic = userPrompt.slice(0, 50);
+    } catch (e) {
+      const topic = (userPrompt || '').slice(0, 50);
       prompts = [
         'professional ' + topic + ' interior photography',
         topic + ' service close up professional photo',
@@ -112,15 +133,16 @@ async function getImagesForPrompt(userPrompt) {
       ];
     }
 
-    console.log('Generating', prompts.length, 'images with DeepAI...');
+    console.log('Generating', prompts.length, 'images with Together AI...');
     console.log('Image prompts:', prompts);
 
     const results = await Promise.all(
-      prompts.slice(0, 4).map(function(p) { return generateDeepAIImage(p); })
+      prompts.slice(0, 4).map(function(p) { return generateTogetherImage(p); })
     );
 
     const images = results.filter(function(r) { return r !== null; });
-    console.log('DeepAI: Generated', images.length, 'of', prompts.length, 'images successfully');
+    console.log('Together AI: Generated', images.length, 'of', prompts.length, 'images successfully');
+
     return images.length > 0 ? images : null;
   } catch (err) {
     console.error('getImagesForPrompt error:', err.message);
@@ -131,7 +153,10 @@ async function getImagesForPrompt(userPrompt) {
 function getBaseFiles(appCode) {
   return {
     'package.json': JSON.stringify({
-      name: 'codeai-project', private: true, version: '0.0.0', type: 'module',
+      name: 'codeai-project',
+      private: true,
+      version: '0.0.0',
+      type: 'module',
       scripts: { dev: 'vite', build: 'tsc && vite build', preview: 'vite preview' },
       dependencies: { react: '^18.2.0', 'react-dom': '^18.2.0', 'lucide-react': '^0.263.1' },
       devDependencies: {
@@ -205,7 +230,7 @@ function buildPrompt(userRequest, currentAppCode, chatHistory, images) {
     ].join('\n');
   }
 
-  const p2 = userRequest.toLowerCase();
+  const p2 = (userRequest || '').toLowerCase();
   let fonts = FONT_PAIRS.default;
   if (/barber|barbearia|haircut/.test(p2)) fonts = FONT_PAIRS.barbershop;
   else if (/restauran|food|comida|cafe|pizza/.test(p2)) fonts = FONT_PAIRS.restaurant;
@@ -235,7 +260,7 @@ function buildPrompt(userRequest, currentAppCode, chatHistory, images) {
     'Usage rules:',
     '- IMAGE_1_URL: hero section background (use as src in <img> with object-cover, or as backgroundImage in style)',
     '- IMAGE_2_URL: about/gallery section',
-    '- IMAGE_3_URL: services or team section', 
+    '- IMAGE_3_URL: services or team section',
     '- IMAGE_4_URL: another section or gallery',
     'CRITICAL: Copy the URLs EXACTLY. Do not add, remove or change any character.',
     'FORBIDDEN: Do NOT use unsplash.com, picsum, placeholder, or any other image source.',
@@ -293,8 +318,9 @@ async function callOpenRouter(prompt) {
   });
 
   if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.error && err.error.message ? err.error.message : 'OpenRouter error ' + response.status);
+    const err = await response.json().catch(function() { return null; });
+    const msg = err && err.error && err.error.message ? err.error.message : 'OpenRouter error ' + response.status;
+    throw new Error(msg);
   }
 
   const data = await response.json();
@@ -323,8 +349,9 @@ async function callAnthropicVision(image, mediaType, prompt) {
   });
 
   if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.error && err.error.message ? err.error.message : 'Anthropic error ' + response.status);
+    const err = await response.json().catch(function() { return null; });
+    const msg = err && err.error && err.error.message ? err.error.message : 'Anthropic error ' + response.status;
+    throw new Error(msg);
   }
 
   const data = await response.json();
@@ -337,15 +364,17 @@ app.post('/api/generate', async (req, res) => {
 
   try {
     let images = null;
+
     if (!currentAppCode) {
-      console.log('Generating DeepAI images for:', prompt);
+      console.log('Generating Together AI images for:', prompt);
       images = await getImagesForPrompt(prompt);
-      console.log('DeepAI result:', images ? images.length + ' images' : 'failed, no images');
+      console.log('Together AI result:', images ? images.length + ' images' : 'failed, no images');
     }
 
     const appCode = await callOpenRouter(buildPrompt(prompt, currentAppCode, chatHistory, images));
     const files = getBaseFiles(appCode);
-    res.json({ files, appCode });
+
+    res.json({ files, appCode, images });
   } catch (err) {
     console.error('/api/generate error:', err.message);
     res.status(500).json({ error: err.message });
@@ -385,12 +414,13 @@ app.post('/api/chat', async (req, res) => {
   const { prompt, code } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt required' });
 
-  const fullPrompt = 'You are an HTML/CSS/JS expert. Return ONLY complete HTML, no markdown.\n\n' +
+  const fullPrompt =
+    'You are an HTML/CSS/JS expert. Return ONLY complete HTML, no markdown.\n\n' +
     (code ? 'Current code:\n' + code + '\n\nRequest: ' + prompt : prompt);
 
   try {
     const result = await callOpenRouter(fullPrompt);
-    res.json({ result: result.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim() });
+    res.json({ result: (result || '').replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim() });
   } catch (err) {
     console.error('/api/chat error:', err.message);
     res.status(500).json({ error: err.message });
