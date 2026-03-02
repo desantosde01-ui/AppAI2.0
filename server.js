@@ -81,7 +81,7 @@ async function generateDeepAIImage(prompt) {
     }
 
     const data = await response.json();
-    if (data.output_url) {
+    if (data.output_url && data.output_url.startsWith('http')) {
       console.log('DeepAI image generated OK:', data.output_url);
       return { url: data.output_url, alt: prompt };
     }
@@ -228,16 +228,21 @@ function buildPrompt(userRequest, currentAppCode, chatHistory, images) {
   ].join('\n');
 
   const imageInstruction = images && images.length > 0 ? [
-    'IMAGES: Use these AI-generated images (use the URLs directly in <img> tags):',
-    images.map(function(img, i) { return '  Image ' + (i+1) + ': ' + img.url + ' (alt: "' + img.alt + '")'; }).join('\n'),
-    '  - Use Image 1 as hero background (full width, object-cover with dark overlay for text readability)',
-    '  - Use other images in gallery, team, or feature sections',
-    '  - Always add loading="lazy" and proper alt text',
+    '!!! IMAGES - READ CAREFULLY !!!',
+    'You have ' + images.length + ' AI-generated image URLs. You MUST use ALL of them exactly as provided.',
+    'Copy each URL character by character into your <img src=""> tags. DO NOT modify them.',
+    images.map(function(img, i) { return 'IMAGE_' + (i+1) + '_URL=' + img.url; }).join('\n'),
+    'Usage rules:',
+    '- IMAGE_1_URL: hero section background (use as src in <img> with object-cover, or as backgroundImage in style)',
+    '- IMAGE_2_URL: about/gallery section',
+    '- IMAGE_3_URL: services or team section', 
+    '- IMAGE_4_URL: another section or gallery',
+    'CRITICAL: Copy the URLs EXACTLY. Do not add, remove or change any character.',
+    'FORBIDDEN: Do NOT use unsplash.com, picsum, placeholder, or any other image source.',
   ].join('\n') : [
-    'IMAGES: No images were provided. DO NOT use any external image URLs.',
-    'DO NOT search or invent Unsplash, Google, or any other image URLs.',
-    'Instead: use solid color div backgrounds with CSS gradients as placeholders.',
-    'Example: <div className="w-full h-64 bg-gradient-to-br from-slate-700 to-slate-900" />',
+    'IMAGES: No images provided.',
+    'FORBIDDEN: Do NOT use unsplash.com, picsum.photos, placeholder.com, or invent ANY image URLs.',
+    'Use CSS gradient divs instead: <div className="w-full h-64 bg-gradient-to-br from-gray-700 to-gray-900 rounded-xl" />',
   ].join('\n');
 
   return [
