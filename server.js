@@ -1,7 +1,7 @@
 // server.js
 const express = require('express');
 const cors = require('cors');
-const fetch = require('node-fetch'); // CommonJS: garanta node-fetch@2
+const fetch = require('node-fetch'); // ✅ CommonJS: use node-fetch@2
 const path = require('path');
 
 const app = express();
@@ -34,23 +34,24 @@ const FONT_PAIRS = {
   default: { heading: 'Plus Jakarta Sans', body: 'Inter', url: 'Plus+Jakarta+Sans:wght@600;700;800|Inter:wght@400;500;600' },
 };
 
+// ✅ Sanitiza + BLINDA contra "App already declared" e "return <App/>"
 function sanitizeCode(code) {
   code = (code || '').trim();
 
-  // remove fences
+  // Remove markdown fences
   code = code.replace(/^```[a-zA-Z]*\r?\n/gm, '');
   code = code.replace(/^```\r?$/gm, '');
   code = code.replace(/```[a-zA-Z]*\n/g, '');
   code = code.replace(/```/g, '');
   code = code.trim();
 
-  // smart quotes
+  // Fix smart quotes and special characters
   code = code.replace(/\u201C/g, '"').replace(/\u201D/g, '"');
   code = code.replace(/\u2018/g, "'").replace(/\u2019/g, "'");
   code = code.replace(/\u2013/g, '-').replace(/\u2014/g, '-');
   code = code.replace(/\u00A0/g, ' ');
 
-  // dedupe import React
+  // Remove duplicate import React statements - keep only the first one
   let reactImportFound = false;
   code = code
     .split('\n')
@@ -63,6 +64,30 @@ function sanitizeCode(code) {
     })
     .join('\n');
 
+  // 🚫 Remove recursive "return <App />;"
+  code = code.replace(/return\s+<App\s*\/>\s*;?/g, 'return null;');
+
+  // 🚫 Garantir apenas 1 "export default function App() { ... }"
+  const appFnRegex = /export\s+default\s+function\s+App\s*\(\)\s*{[\s\S]*?}\s*/g;
+  const appFns = code.match(appFnRegex);
+  if (appFns && appFns.length > 1) {
+    // remove todas e coloca só a primeira no final
+    code = code.replace(appFnRegex, '');
+    code = (code.trim() + '\n\n' + appFns[0].trim() + '\n').trim();
+  }
+
+  // 🚫 Se existir "function App() { ... }" e também "export default function App() { ... }", renomeia a interna
+  const hasNonExportApp = /(^|\n)\s*function\s+App\s*\(\)\s*{/.test(code);
+  const hasExportDefaultApp = /export\s+default\s+function\s+App\s*\(\)\s*{/.test(code);
+  if (hasNonExportApp && hasExportDefaultApp) {
+    // renomeia a não-exportada para AppInner
+    code = code.replace(/(^|\n)\s*function\s+App\s*\(\)\s*{/m, function (m) {
+      return m.replace('function App', 'function AppInner');
+    });
+    // e troca usos diretos de <App /> por <AppInner /> (exceto dentro da export default App)
+    code = code.replace(/<App(\s*\/>|[\s>])/g, '<AppInner$1');
+  }
+
   return code;
 }
 
@@ -73,6 +98,7 @@ async function callOpenRouterText(prompt, opts) {
   if (!OPENROUTER_API_KEY) throw new Error('Missing OPENROUTER_API_KEY');
 
   const model = (opts && opts.model) || 'openai/gpt-4o';
+  const maxTokens = (opts && opts.max_tokens) || 16000;
 
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -82,7 +108,7 @@ async function callOpenRouterText(prompt, opts) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: (opts && opts.max_tokens) || 16000,
+      max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
     }),
   });
@@ -100,6 +126,7 @@ async function callOpenRouterVision(base64, mediaType, prompt, opts) {
   if (!OPENROUTER_API_KEY) throw new Error('Missing OPENROUTER_API_KEY');
 
   const model = (opts && opts.model) || 'openai/gpt-4o';
+  const maxTokens = (opts && opts.max_tokens) || 16000;
   const dataUrl = 'data:' + (mediaType || 'image/png') + ';base64,' + base64;
 
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -110,7 +137,7 @@ async function callOpenRouterVision(base64, mediaType, prompt, opts) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: (opts && opts.max_tokens) || 16000,
+      max_tokens: maxTokens,
       messages: [
         {
           role: 'user',
@@ -133,7 +160,7 @@ async function callOpenRouterVision(base64, mediaType, prompt, opts) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Together (imagens baratas)
+// Together (imagens)
 // ─────────────────────────────────────────────────────────────────────────────
 async function generateTogetherImage(prompt) {
   try {
@@ -191,7 +218,7 @@ async function getImagesForPrompt(userPrompt) {
   try {
     if (!TOGETHER_API_KEY) return null;
 
-    // GPT-4o cria 4 prompts
+    // GPT-4o gera 4 prompts (barato e consistente)
     const promptGen =
       'Create 4 specific English image prompts for AI image generation for this website request:\n' +
       '"' +
@@ -232,7 +259,7 @@ async function getImagesForPrompt(userPrompt) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Project files
+// Base project files
 // ─────────────────────────────────────────────────────────────────────────────
 function getBaseFiles(appCode) {
   return {
@@ -313,15 +340,16 @@ function buildPrompt(userRequest, currentAppCode, images) {
 
   const rules = [
     'Return ONLY raw TSX code with NO markdown fences, no backticks, no explanations',
-    'Start directly with: import React from "react"',
-    'Export: export default function App()',
-    'Use Tailwind CSS only for all styles',
+    'Start with: import React from "react"',
+    'Declare App ONLY ONCE. Do NOT declare another App component or wrapper.',
+    'Export exactly like this at the very end: export default App;',
+    'Do NOT write: export default function App() { return <App/> }',
+    'Use Tailwind CSS only',
     'Use lucide-react for icons (already installed)',
     'No external imports besides react and lucide-react',
     'Use only ASCII characters in strings and JSX text',
-    'ALL strings must be properly closed',
-    'ALL JSX tags must be properly closed',
-    'NEVER use unsplash.com, picsum.photos, via.placeholder.com, or any random image URL',
+    'ALL strings and JSX tags must be properly closed',
+    'NEVER use unsplash.com, picsum.photos, via.placeholder.com, or random image URLs',
   ].join('\n- ');
 
   if (isModify) {
@@ -339,17 +367,24 @@ function buildPrompt(userRequest, currentAppCode, images) {
 
   const p2 = (userRequest || '').toLowerCase();
   let fonts = FONT_PAIRS.default;
-  if (/advogad|juridic|law|legal/.test(p2)) fonts = FONT_PAIRS.law;
-  else if (/barber|barbearia|haircut/.test(p2)) fonts = FONT_PAIRS.barbershop;
+  if (/barber|barbearia|haircut/.test(p2)) fonts = FONT_PAIRS.barbershop;
   else if (/restauran|food|comida|cafe|pizza/.test(p2)) fonts = FONT_PAIRS.restaurant;
+  else if (/advogad|juridic|law|legal/.test(p2)) fonts = FONT_PAIRS.law;
   else if (/tech|software|startup|saas/.test(p2)) fonts = FONT_PAIRS.tech;
   else if (/pilates|yoga|estetica|beleza|spa/.test(p2)) fonts = FONT_PAIRS.beauty;
+  else if (/academia|gym|fitness|treino/.test(p2)) fonts = FONT_PAIRS.fitness;
+  else if (/medic|clinic|saude|dental/.test(p2)) fonts = FONT_PAIRS.medical;
+  else if (/imovel|imobiliaria|casa/.test(p2)) fonts = FONT_PAIRS.realestate;
+  else if (/hotel|pousada|resort/.test(p2)) fonts = FONT_PAIRS.hotel;
+  else if (/constru|arquitet|engenhei/.test(p2)) fonts = FONT_PAIRS.construction;
+  else if (/financ|contabil|investiment/.test(p2)) fonts = FONT_PAIRS.finance;
+  else if (/carro|auto|oficina|mecanica/.test(p2)) fonts = FONT_PAIRS.automotive;
 
   const fontInstruction = [
     'FONTS: Load these Google Fonts in a useEffect by injecting a <link> tag:',
     'URL: https://fonts.googleapis.com/css2?family=' + fonts.url + '&display=swap',
-    'Heading font: "' + fonts.heading + '"',
-    'Body font: "' + fonts.body + '"',
+    'Apply body font to document.body.style.fontFamily.',
+    'Apply heading font to headings using style={{fontFamily: "...", serif}} (or sans if appropriate).',
   ].join('\n');
 
   const imageInstruction =
@@ -360,6 +395,7 @@ function buildPrompt(userRequest, currentAppCode, images) {
           'Use IMAGE_1_URL as hero background image (img + overlay).',
           'Use IMAGE_2_URL..IMAGE_4_URL across services/gallery/team sections.',
           'FORBIDDEN: Do not use any other image URL.',
+          'Always add loading="lazy" on non-hero images.',
         ].join('\n')
       : [
           'IMAGES: No images provided. Do not use external image URLs.',
@@ -374,7 +410,13 @@ function buildPrompt(userRequest, currentAppCode, images) {
     '- Premium hero, strong typography, elegant spacing',
     '- Sections: Services, About, Team, Contact',
     '- Buttons with hover transitions',
+    '',
+    'IMPORTANT OUTPUT FORMAT:',
+    '- Must contain exactly one component: function App() { ... }',
+    '- Must end with: export default App;',
+    '',
     'RULES:\n- ' + rules,
+    '',
     'Create a stunning, agency-quality React app for: ' + userRequest,
     'Return only App.tsx:',
   ].join('\n\n');
@@ -384,7 +426,7 @@ function buildPrompt(userRequest, currentAppCode, images) {
 // Routes
 // ─────────────────────────────────────────────────────────────────────────────
 app.post('/api/generate', async (req, res) => {
-  const { prompt, currentAppCode, chatHistory } = req.body;
+  const { prompt, currentAppCode } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt required' });
 
   try {
@@ -396,7 +438,6 @@ app.post('/api/generate', async (req, res) => {
       console.log('Images result:', images ? images.length + ' images' : 'no images');
     }
 
-    // GPT-4o gera o App.tsx
     const appCode = await callOpenRouterText(buildPrompt(prompt, currentAppCode, images), {
       model: 'openai/gpt-4o',
       max_tokens: 16000,
@@ -410,7 +451,7 @@ app.post('/api/generate', async (req, res) => {
   }
 });
 
-// Recriar UI a partir de imagem (GPT-4o vision via OpenRouter)
+// Recriar UI a partir de imagem (GPT-4o Vision via OpenRouter)
 app.post('/api/image', async (req, res) => {
   const { image, mediaType, prompt } = req.body;
   if (!image) return res.status(400).json({ error: 'Image required' });
@@ -423,7 +464,8 @@ app.post('/api/image', async (req, res) => {
     'RULES:',
     '- Return ONLY raw TSX code, no markdown fences',
     '- Start with: import React from "react"',
-    '- Export: export default function App()',
+    '- Declare function App() ONLY ONCE',
+    '- End with: export default App;',
     '- Use Tailwind CSS only',
     '- Use lucide-react for icons if needed',
     '- ASCII characters only in strings',
