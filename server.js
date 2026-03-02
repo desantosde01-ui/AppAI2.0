@@ -1,7 +1,7 @@
 // server.js
 const express = require('express');
 const cors = require('cors');
-const fetch = require('node-fetch'); // use node-fetch@2 if you're on CommonJS
+const fetch = require('node-fetch'); // ✅ CommonJS: garanta node-fetch@2
 const path = require('path');
 
 const app = express();
@@ -9,8 +9,6 @@ const PORT = process.env.PORT || 3000;
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-
-// NEW: Together AI key (set this in Railway env vars)
 const TOGETHER_API_KEY = process.env.TOGETHER_API_KEY;
 
 app.use(cors());
@@ -38,49 +36,62 @@ const FONT_PAIRS = {
 
 function sanitizeCode(code) {
   code = (code || '').trim();
+
+  // Remove ALL markdown code fences anywhere in the code
   code = code.replace(/^```[a-zA-Z]*\r?\n/gm, '');
   code = code.replace(/^```\r?$/gm, '');
   code = code.replace(/```[a-zA-Z]*\n/g, '');
   code = code.replace(/```/g, '');
   code = code.trim();
+
+  // Fix smart quotes and special characters
   code = code.replace(/\u201C/g, '"').replace(/\u201D/g, '"');
   code = code.replace(/\u2018/g, "'").replace(/\u2019/g, "'");
   code = code.replace(/\u2013/g, '-').replace(/\u2014/g, '-');
   code = code.replace(/\u00A0/g, ' ');
 
+  // Remove duplicate import React statements - keep only the first one
   let reactImportFound = false;
-  code = code.split('\n').filter(function(line) {
-    if (/^import React/.test(line.trim())) {
-      if (reactImportFound) return false;
-      reactImportFound = true;
-    }
-    return true;
-  }).join('\n');
+  code = code
+    .split('\n')
+    .filter(function (line) {
+      if (/^import React/.test(line.trim())) {
+        if (reactImportFound) return false;
+        reactImportFound = true;
+      }
+      return true;
+    })
+    .join('\n');
 
   return code;
 }
 
-// ─── TOGETHER AI IMAGE GENERATION ────────────────────────────────────────────
+// ─── TOGETHER AI IMAGE GENERATION (Stable Diffusion 3) ───────────────────────
 async function generateTogetherImage(prompt) {
   try {
     if (!TOGETHER_API_KEY) {
-      console.error('Missing TOGETHER_API_KEY (set it in your Railway environment variables)');
+      console.error('Missing TOGETHER_API_KEY (set it in Railway/Env)');
       return null;
     }
 
     const response = await fetch('https://api.together.xyz/v1/images/generations', {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer ' + TOGETHER_API_KEY,
-        'Content-Type': 'application/json'
+        Authorization: 'Bearer ' + TOGETHER_API_KEY,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'ideogram/ideogram-3.0',
+        model: 'stabilityai/stable-diffusion-3', // ✅ barato e bom
         prompt: prompt,
-        // You can tweak size if you want:
+
+        // ✅ força retorno em URL (mas mantemos fallback base64)
+        response_format: 'url',
+
         width: 1024,
-        height: 1024
-      })
+        height: 1024,
+        steps: 30,
+        output_format: 'jpeg',
+      }),
     });
 
     if (!response.ok) {
@@ -91,15 +102,19 @@ async function generateTogetherImage(prompt) {
 
     const data = await response.json();
 
-    // Typical Together format: { data: [{ url: "..." }, ...] }
-    const url =
-      data && data.data && Array.isArray(data.data) && data.data[0] && data.data[0].url
-        ? data.data[0].url
-        : null;
-
+    // 1) URL (preferido)
+    const url = data && data.data && data.data[0] && data.data[0].url ? data.data[0].url : null;
     if (url && typeof url === 'string' && url.startsWith('http')) {
-      console.log('Together AI image generated OK:', url);
+      console.log('Together image URL OK:', url);
       return { url: url, alt: prompt };
+    }
+
+    // 2) Fallback: base64
+    const b64 = data && data.data && data.data[0] && data.data[0].b64_json ? data.data[0].b64_json : null;
+    if (b64 && typeof b64 === 'string') {
+      const dataUri = 'data:image/jpeg;base64,' + b64;
+      console.log('Together image base64 OK (data URI)');
+      return { url: dataUri, alt: prompt };
     }
 
     console.error('Together AI unexpected response:', JSON.stringify(data));
@@ -112,10 +127,13 @@ async function generateTogetherImage(prompt) {
 
 async function getImagesForPrompt(userPrompt) {
   try {
+    // Se não tiver chave, nem tenta gerar (site ainda sai com gradientes)
+    if (!TOGETHER_API_KEY) return null;
+
     const promptGeneration =
-      'Based on this website request: "' + userPrompt + '", generate 4 specific English image prompts for AI image generation. ' +
-      'Each prompt should describe a professional, high-quality photo relevant to this business. ' +
-      'Return ONLY a JSON array of 4 strings, nothing else. Example: ["professional barbershop interior with leather chairs", "barber cutting hair close up", "razor and grooming tools on marble", "stylish man after haircut"]';
+      'Based on this website request: "' +
+      userPrompt +
+      '", generate 4 specific English image prompts for AI image generation. Each prompt should describe a professional, high-quality photo relevant to this business. Return ONLY a JSON array of 4 strings, nothing else. Example: ["professional barbershop interior with leather chairs", "barber cutting hair close up", "razor and grooming tools on marble", "stylish man after haircut"]';
 
     const raw = await callOpenRouter(promptGeneration);
     const clean = (raw || '').replace(/```json|```/g, '').trim();
@@ -129,20 +147,17 @@ async function getImagesForPrompt(userPrompt) {
         'professional ' + topic + ' interior photography',
         topic + ' service close up professional photo',
         topic + ' team working professional',
-        topic + ' product or space elegant photography'
+        topic + ' product or space elegant photography',
       ];
     }
 
     console.log('Generating', prompts.length, 'images with Together AI...');
     console.log('Image prompts:', prompts);
 
-    const results = await Promise.all(
-      prompts.slice(0, 4).map(function(p) { return generateTogetherImage(p); })
-    );
+    const results = await Promise.all(prompts.slice(0, 4).map(function (p) { return generateTogetherImage(p); }));
+    const images = results.filter(function (r) { return r !== null; });
 
-    const images = results.filter(function(r) { return r !== null; });
     console.log('Together AI: Generated', images.length, 'of', prompts.length, 'images successfully');
-
     return images.length > 0 ? images : null;
   } catch (err) {
     console.error('getImagesForPrompt error:', err.message);
@@ -152,40 +167,75 @@ async function getImagesForPrompt(userPrompt) {
 
 function getBaseFiles(appCode) {
   return {
-    'package.json': JSON.stringify({
-      name: 'codeai-project',
-      private: true,
-      version: '0.0.0',
-      type: 'module',
-      scripts: { dev: 'vite', build: 'tsc && vite build', preview: 'vite preview' },
-      dependencies: { react: '^18.2.0', 'react-dom': '^18.2.0', 'lucide-react': '^0.263.1' },
-      devDependencies: {
-        '@types/react': '^18.2.0', '@types/react-dom': '^18.2.0',
-        '@vitejs/plugin-react': '^4.0.0', autoprefixer: '^10.4.14',
-        postcss: '^8.4.27', tailwindcss: '^3.3.3', typescript: '^5.0.2', vite: '^4.4.5'
-      }
-    }, null, 2),
-    'vite.config.ts': "import { defineConfig } from 'vite'\nimport react from '@vitejs/plugin-react'\nexport default defineConfig({ plugins: [react()] })",
-    'tsconfig.json': JSON.stringify({
-      compilerOptions: {
-        target: 'ES2020', useDefineForClassFields: true,
-        lib: ['ES2020', 'DOM', 'DOM.Iterable'], module: 'ESNext',
-        skipLibCheck: true, moduleResolution: 'bundler',
-        allowImportingTsExtensions: true, resolveJsonModule: true,
-        isolatedModules: true, noEmit: true, jsx: 'react-jsx', strict: false
+    'package.json': JSON.stringify(
+      {
+        name: 'codeai-project',
+        private: true,
+        version: '0.0.0',
+        type: 'module',
+        scripts: { dev: 'vite', build: 'tsc && vite build', preview: 'vite preview' },
+        dependencies: { react: '^18.2.0', 'react-dom': '^18.2.0', 'lucide-react': '^0.263.1' },
+        devDependencies: {
+          '@types/react': '^18.2.0',
+          '@types/react-dom': '^18.2.0',
+          '@vitejs/plugin-react': '^4.0.0',
+          autoprefixer: '^10.4.14',
+          postcss: '^8.4.27',
+          tailwindcss: '^3.3.3',
+          typescript: '^5.0.2',
+          vite: '^4.4.5',
+        },
       },
-      include: ['src']
-    }, null, 2),
-    'tsconfig.node.json': JSON.stringify({
-      compilerOptions: { composite: true, skipLibCheck: true, module: 'ESNext', moduleResolution: 'bundler', allowSyntheticDefaultImports: true },
-      include: ['vite.config.ts']
-    }, null, 2),
-    'postcss.config.js': "export default { plugins: { tailwindcss: {}, autoprefixer: {} } }",
-    'tailwind.config.js': "export default { content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'], theme: { extend: {} }, plugins: [] }",
-    'index.html': '<!DOCTYPE html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <title>CodeAI App</title>\n  </head>\n  <body>\n    <div id="root"></div>\n    <script type="module" src="/src/main.tsx"></script>\n  </body>\n</html>',
-    'src/main.tsx': "import React from 'react'\nimport ReactDOM from 'react-dom/client'\nimport App from './App'\nimport './index.css'\n\nReactDOM.createRoot(document.getElementById('root')!).render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>,\n)",
-    'src/index.css': '@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n* { box-sizing: border-box; }\nbody { margin: 0; }',
-    'src/App.tsx': appCode
+      null,
+      2
+    ),
+    'vite.config.ts':
+      "import { defineConfig } from 'vite'\nimport react from '@vitejs/plugin-react'\nexport default defineConfig({ plugins: [react()] })",
+    'tsconfig.json': JSON.stringify(
+      {
+        compilerOptions: {
+          target: 'ES2020',
+          useDefineForClassFields: true,
+          lib: ['ES2020', 'DOM', 'DOM.Iterable'],
+          module: 'ESNext',
+          skipLibCheck: true,
+          moduleResolution: 'bundler',
+          allowImportingTsExtensions: true,
+          resolveJsonModule: true,
+          isolatedModules: true,
+          noEmit: true,
+          jsx: 'react-jsx',
+          strict: false,
+        },
+        include: ['src'],
+      },
+      null,
+      2
+    ),
+    'tsconfig.node.json': JSON.stringify(
+      {
+        compilerOptions: {
+          composite: true,
+          skipLibCheck: true,
+          module: 'ESNext',
+          moduleResolution: 'bundler',
+          allowSyntheticDefaultImports: true,
+        },
+        include: ['vite.config.ts'],
+      },
+      null,
+      2
+    ),
+    'postcss.config.js': 'export default { plugins: { tailwindcss: {}, autoprefixer: {} } }',
+    'tailwind.config.js':
+      "export default { content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'], theme: { extend: {} }, plugins: [] }",
+    'index.html':
+      '<!DOCTYPE html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <title>CodeAI App</title>\n  </head>\n  <body>\n    <div id="root"></div>\n    <script type="module" src="/src/main.tsx"></script>\n  </body>\n</html>',
+    'src/main.tsx':
+      "import React from 'react'\nimport ReactDOM from 'react-dom/client'\nimport App from './App'\nimport './index.css'\n\nReactDOM.createRoot(document.getElementById('root')!).render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>,\n)\n",
+    'src/index.css':
+      '@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n* { box-sizing: border-box; }\nbody { margin: 0; }',
+    'src/App.tsx': appCode,
   };
 }
 
@@ -208,7 +258,7 @@ function buildPrompt(userRequest, currentAppCode, chatHistory, images) {
     'For responsive layouts use Tailwind: className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3"',
     'For responsive visibility use Tailwind: className="hidden md:flex" or className="flex md:hidden"',
     'Count every opening { and make sure it has a matching closing }',
-    'Count every opening ( and make sure it has a matching closing )'
+    'Count every opening ( and make sure it has a matching closing )',
   ].join('\n- ');
 
   if (isModify) {
@@ -226,7 +276,7 @@ function buildPrompt(userRequest, currentAppCode, chatHistory, images) {
       '',
       'USER REQUEST: ' + userRequest,
       '',
-      'Return the complete modified App.tsx:'
+      'Return the complete modified App.tsx:',
     ].join('\n');
   }
 
@@ -248,27 +298,35 @@ function buildPrompt(userRequest, currentAppCode, chatHistory, images) {
   const fontInstruction = [
     'FONTS: Load these Google Fonts in a useEffect by injecting a <link> tag:',
     '  URL: https://fonts.googleapis.com/css2?family=' + fonts.url + '&display=swap',
-    '  Heading font: "' + fonts.heading + '" - use with style={{fontFamily: \'"' + fonts.heading + '", serif\'}} on all headings',
+    '  Heading font: "' +
+      fonts.heading +
+      "\" - use with style={{fontFamily: '\"" +
+      fonts.heading +
+      "\", serif'}} on all headings",
     '  Body font: "' + fonts.body + '" - inject on document.body style',
   ].join('\n');
 
-  const imageInstruction = images && images.length > 0 ? [
-    '!!! IMAGES - READ CAREFULLY !!!',
-    'You have ' + images.length + ' AI-generated image URLs. You MUST use ALL of them exactly as provided.',
-    'Copy each URL character by character into your <img src=""> tags. DO NOT modify them.',
-    images.map(function(img, i) { return 'IMAGE_' + (i+1) + '_URL=' + img.url; }).join('\n'),
-    'Usage rules:',
-    '- IMAGE_1_URL: hero section background (use as src in <img> with object-cover, or as backgroundImage in style)',
-    '- IMAGE_2_URL: about/gallery section',
-    '- IMAGE_3_URL: services or team section',
-    '- IMAGE_4_URL: another section or gallery',
-    'CRITICAL: Copy the URLs EXACTLY. Do not add, remove or change any character.',
-    'FORBIDDEN: Do NOT use unsplash.com, picsum, placeholder, or any other image source.',
-  ].join('\n') : [
-    'IMAGES: No images provided.',
-    'FORBIDDEN: Do NOT use unsplash.com, picsum.photos, placeholder.com, or invent ANY image URLs.',
-    'Use CSS gradient divs instead: <div className="w-full h-64 bg-gradient-to-br from-gray-700 to-gray-900 rounded-xl" />',
-  ].join('\n');
+  const imageInstruction =
+    images && images.length > 0
+      ? [
+          '!!! IMAGES - READ CAREFULLY !!!',
+          'You have ' + images.length + ' AI-generated image URLs. You MUST use ALL of them exactly as provided.',
+          'Copy each URL character by character into your <img src=""> tags. DO NOT modify them.',
+          images.map(function (img, i) { return 'IMAGE_' + (i + 1) + '_URL=' + img.url; }).join('\n'),
+          'Usage rules:',
+          '- IMAGE_1_URL: hero section background (use as src in <img> with object-cover, plus a dark overlay for readability)',
+          '- IMAGE_2_URL: about/gallery section',
+          '- IMAGE_3_URL: services or team section',
+          '- IMAGE_4_URL: another section or gallery',
+          'CRITICAL: Copy the URLs EXACTLY. Do not add, remove or change any character.',
+          'FORBIDDEN: Do NOT use unsplash.com, picsum, placeholder, or any other image source.',
+          'Always use loading="lazy" on non-hero images.',
+        ].join('\n')
+      : [
+          'IMAGES: No images provided.',
+          'FORBIDDEN: Do NOT use unsplash.com, picsum.photos, placeholder.com, or invent ANY image URLs.',
+          'Use CSS gradient divs instead of images: <div className="w-full h-64 bg-gradient-to-br from-gray-700 to-gray-900 rounded-xl" />',
+        ].join('\n');
 
   return [
     'You are a world-class UI/UX designer and React developer creating agency-quality websites.',
@@ -290,16 +348,11 @@ function buildPrompt(userRequest, currentAppCode, chatHistory, images) {
     '- Images: ALWAYS use the exact AI-generated image URLs provided above - NEVER invent or search for image URLs',
     '- NEVER use unsplash.com, images.unsplash.com, picsum.photos, via.placeholder.com, or ANY external image source',
     '- NEVER make up image URLs - if no images are provided, use CSS gradient divs instead',
-    '- Z-index: hero section must have z-index: 0, all other sections z-index: 0, never let content float over hero',
-    '- Parallax: if using parallax effect, use background-attachment: scroll NOT fixed, and wrap in overflow: hidden',
-    '- Custom cursor: if adding cursor effect, use mousemove event with NO transition/animation delay on the cursor element itself - cursor must follow mouse instantly with transform: translate(x, y)',
-    '- Section containers: always add overflow: hidden to section wrappers that contain animated elements',
-    '- Image hover effects: never use position: fixed on images, use transform: scale() instead',
     '',
     'RULES:\n- ' + rules,
     '',
     'Create a stunning, agency-quality React app for: ' + userRequest,
-    'Return only App.tsx:'
+    'Return only App.tsx:',
   ].join('\n');
 }
 
@@ -308,19 +361,18 @@ async function callOpenRouter(prompt) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + OPENROUTER_API_KEY
+      Authorization: 'Bearer ' + OPENROUTER_API_KEY,
     },
     body: JSON.stringify({
       model: 'anthropic/claude-sonnet-4-5',
       max_tokens: 16000,
-      messages: [{ role: 'user', content: prompt }]
-    })
+      messages: [{ role: 'user', content: prompt }],
+    }),
   });
 
   if (!response.ok) {
-    const err = await response.json().catch(function() { return null; });
-    const msg = err && err.error && err.error.message ? err.error.message : 'OpenRouter error ' + response.status;
-    throw new Error(msg);
+    const err = await response.json().catch(function () { return null; });
+    throw new Error(err && err.error && err.error.message ? err.error.message : 'OpenRouter error ' + response.status);
   }
 
   const data = await response.json();
@@ -333,25 +385,26 @@ async function callAnthropicVision(image, mediaType, prompt) {
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01'
+      'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
       max_tokens: 16000,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: mediaType, data: image } },
-          { type: 'text', text: prompt }
-        ]
-      }]
-    })
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: image } },
+            { type: 'text', text: prompt },
+          ],
+        },
+      ],
+    }),
   });
 
   if (!response.ok) {
-    const err = await response.json().catch(function() { return null; });
-    const msg = err && err.error && err.error.message ? err.error.message : 'Anthropic error ' + response.status;
-    throw new Error(msg);
+    const err = await response.json().catch(function () { return null; });
+    throw new Error(err && err.error && err.error.message ? err.error.message : 'Anthropic error ' + response.status);
   }
 
   const data = await response.json();
@@ -374,6 +427,7 @@ app.post('/api/generate', async (req, res) => {
     const appCode = await callOpenRouter(buildPrompt(prompt, currentAppCode, chatHistory, images));
     const files = getBaseFiles(appCode);
 
+    // images vai junto só pra debug (opcional)
     res.json({ files, appCode, images });
   } catch (err) {
     console.error('/api/generate error:', err.message);
@@ -397,10 +451,14 @@ app.post('/api/image', async (req, res) => {
     '- Use Tailwind CSS only',
     '- Use lucide-react for icons if needed',
     '- ASCII characters only in strings',
-    '- Be faithful to the colors, layout and style of the image'
+    '- Be faithful to the colors, layout and style of the image',
   ].join('\n');
 
   try {
+    if (!ANTHROPIC_API_KEY) {
+      return res.status(400).json({ error: 'Missing ANTHROPIC_API_KEY' });
+    }
+
     const appCode = await callAnthropicVision(image, mediaType || 'image/png', visionPrompt);
     const files = getBaseFiles(appCode);
     res.json({ files, appCode });
@@ -427,6 +485,6 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-app.listen(PORT, function() {
+app.listen(PORT, function () {
   console.log('CodeAI running on port ' + PORT);
 });
