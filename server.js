@@ -61,29 +61,34 @@ function sanitizeCode(code) {
 // ─── DEEPAI IMAGE GENERATION ─────────────────────────────────────────────────
 async function generateDeepAIImage(prompt) {
   try {
-    const formData = new FormData();
-    formData.append('text', prompt);
+    // Use URLSearchParams - works reliably with node-fetch without extra dependencies
+    const params = new URLSearchParams();
+    params.append('text', prompt);
 
     const response = await fetch('https://api.deepai.org/api/text2img', {
       method: 'POST',
-      headers: { 'api-key': DEEPAI_API_KEY },
-      body: formData
+      headers: {
+        'api-key': DEEPAI_API_KEY,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: params.toString()
     });
 
     if (!response.ok) {
-      console.error('DeepAI error status:', response.status);
+      const errText = await response.text();
+      console.error('DeepAI error status:', response.status, errText);
       return null;
     }
 
     const data = await response.json();
     if (data.output_url) {
-      console.log('DeepAI image generated:', data.output_url);
+      console.log('DeepAI image generated OK:', data.output_url);
       return { url: data.output_url, alt: prompt };
     }
-    console.error('DeepAI no output_url:', JSON.stringify(data));
+    console.error('DeepAI no output_url in response:', JSON.stringify(data));
     return null;
   } catch (err) {
-    console.error('DeepAI error:', err.message);
+    console.error('DeepAI fetch error:', err.message);
     return null;
   }
 }
@@ -228,7 +233,12 @@ function buildPrompt(userRequest, currentAppCode, chatHistory, images) {
     '  - Use Image 1 as hero background (full width, object-cover with dark overlay for text readability)',
     '  - Use other images in gallery, team, or feature sections',
     '  - Always add loading="lazy" and proper alt text',
-  ].join('\n') : 'IMAGES: Use relevant placeholder images for the content.';
+  ].join('\n') : [
+    'IMAGES: No images were provided. DO NOT use any external image URLs.',
+    'DO NOT search or invent Unsplash, Google, or any other image URLs.',
+    'Instead: use solid color div backgrounds with CSS gradients as placeholders.',
+    'Example: <div className="w-full h-64 bg-gradient-to-br from-slate-700 to-slate-900" />',
+  ].join('\n');
 
   return [
     'You are a world-class UI/UX designer and React developer creating agency-quality websites.',
@@ -247,7 +257,9 @@ function buildPrompt(userRequest, currentAppCode, chatHistory, images) {
     '- Add subtle section dividers and decorative elements',
     '',
     'CRITICAL BUGS TO AVOID:',
-    '- Images: ALWAYS use the exact AI-generated image URLs provided above - NEVER use placeholder or random images',
+    '- Images: ALWAYS use the exact AI-generated image URLs provided above - NEVER invent or search for image URLs',
+    '- NEVER use unsplash.com, images.unsplash.com, picsum.photos, via.placeholder.com, or ANY external image source',
+    '- NEVER make up image URLs - if no images are provided, use CSS gradient divs instead',
     '- Z-index: hero section must have z-index: 0, all other sections z-index: 0, never let content float over hero',
     '- Parallax: if using parallax effect, use background-attachment: scroll NOT fixed, and wrap in overflow: hidden',
     '- Custom cursor: if adding cursor effect, use mousemove event with NO transition/animation delay on the cursor element itself - cursor must follow mouse instantly with transform: translate(x, y)',
