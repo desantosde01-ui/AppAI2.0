@@ -31,6 +31,18 @@ function toFriendlySetupMessage(errorMessage) {
   return errorMessage;
 }
 
+
+function methodNotAllowed(res, method, endpoint) {
+  return res.status(405).json({
+    error:
+      'HTTP 405: método ' +
+      method +
+      ' não permitido em ' +
+      endpoint +
+      '. Use POST para esta rota de API.',
+  });
+}
+
 const FONT_PAIRS = {
   barbershop: { heading: 'Bebas Neue', body: 'Inter', url: 'Bebas+Neue|Inter:wght@400;500;600' },
   restaurant: { heading: 'Cormorant Garamond', body: 'Nunito', url: 'Cormorant+Garamond:wght@600;700|Nunito:wght@400;600' },
@@ -441,6 +453,11 @@ function buildPrompt(userRequest, currentAppCode, images) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Routes
 // ─────────────────────────────────────────────────────────────────────────────
+app.all('/api/generate', (req, res, next) => {
+  if (req.method !== 'POST') return methodNotAllowed(res, req.method, '/api/generate');
+  next();
+});
+
 app.post('/api/generate', async (req, res) => {
   const { prompt, currentAppCode } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt required' });
@@ -474,6 +491,11 @@ app.get('/api/health', (req, res) => {
 });
 
 // Recriar UI a partir de imagem (GPT-4o Vision via OpenRouter)
+app.all('/api/image', (req, res, next) => {
+  if (req.method !== 'POST') return methodNotAllowed(res, req.method, '/api/image');
+  next();
+});
+
 app.post('/api/image', async (req, res) => {
   const { image, mediaType, prompt } = req.body;
   if (!image) return res.status(400).json({ error: 'Image required' });
@@ -508,6 +530,11 @@ app.post('/api/image', async (req, res) => {
 });
 
 // HTML helper
+app.all('/api/chat', (req, res, next) => {
+  if (req.method !== 'POST') return methodNotAllowed(res, req.method, '/api/chat');
+  next();
+});
+
 app.post('/api/chat', async (req, res) => {
   const { prompt, code } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt required' });
