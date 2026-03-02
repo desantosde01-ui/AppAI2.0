@@ -1,4 +1,3 @@
- (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
 diff --git a/server.js b/server.js
 index b18bb3f927247363779074e4ca712cc394d16097..db8166b79091de5318bb9d5423758b0ed2fd26cb 100644
 --- a/server.js
@@ -160,6 +159,3 @@ index b18bb3f927247363779074e4ca712cc394d16097..db8166b79091de5318bb9d5423758b0e
 +    console.warn('Setup pendente:', issues.join(', '));
 +  }
  });
- 
-EOF
-)
