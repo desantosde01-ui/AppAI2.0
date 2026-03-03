@@ -183,6 +183,21 @@
   let currentView = 'preview';
   let chatHistory = []; // stores conversation history
 
+  async function checkServerSetup() {
+    try {
+      const response = await fetch('/api/health');
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!data.ok) {
+        statusBar.textContent = 'configuração pendente';
+        statusBar.style.color = '#f59e0b';
+        addMessage('⚠️ Configuração pendente no servidor: ' + data.issues.join(', ') + '. Defina OPENROUTER_API_KEY para habilitar a geração.', 'ai');
+      }
+    } catch (_) {
+      // silently ignore connectivity checks
+    }
+  }
+
   // Auto-resize textarea
   chatInput.addEventListener('input', () => {
     chatInput.style.height = 'auto';
@@ -295,6 +310,33 @@
     if (currentProject) launchStackBlitz(currentProject);
   }
 
+  async function parseApiResponse(response) {
+    const rawText = await response.text();
+    let data = null;
+
+    if (rawText) {
+      try {
+        data = JSON.parse(rawText);
+      } catch (_) {
+        if (response.ok) {
+          throw new Error('Resposta inválida do servidor (esperado JSON).');
+        }
+      }
+    }
+
+    if (!response.ok) {
+      const serverMessage = data && data.error ? data.error : '';
+      const fallback = rawText ? rawText.slice(0, 200) : `HTTP ${response.status}`;
+      throw new Error(serverMessage || fallback);
+    }
+
+    if (!data) {
+      throw new Error('Servidor retornou resposta vazia. Tente novamente.');
+    }
+
+    return data;
+  }
+
   // SEND MESSAGE
   async function sendMessage() {
     const userMsg = chatInput.value.trim();
@@ -331,12 +373,11 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: imageData.base64, mediaType: imageData.mediaType, prompt })
         });
-        if (!response.ok) { const e = await response.json(); throw new Error(e.error); }
-        const data = await response.json();
+        const data = await parseApiResponse(response);
         files = data.files;
         currentAppCode = data.appCode; // save App.tsx separately
       } else {
-        const response = await fetch('/api/generate', {
+        let response = await fetch('/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -345,8 +386,12 @@
             chatHistory: chatHistory.slice(-10) // send last 10 messages for context
           })
         });
-        if (!response.ok) { const e = await response.json(); throw new Error(e.error); }
-        const data = await response.json();
+        if (response.status === 405) {
+          // Fallback for hosts/proxies that unexpectedly block POST on this route.
+          const query = new URLSearchParams({ prompt: userMsg });
+          response = await fetch('/api/generate?' + query.toString());
+        }
+        const data = await parseApiResponse(response);
         files = data.files;
         currentAppCode = data.appCode; // save App.tsx separately
       }
@@ -359,7 +404,11 @@
       loadingMsg.className = 'msg ai';
 
     } catch (err) {
-      loadingMsg.textContent = `✗ Erro: ${err.message}`;
+      const errText = (err && err.message) ? err.message : 'erro inesperado';
+      const setupHint = errText.includes('OPENROUTER_API_KEY')
+        ? ' Dica: configure a variável OPENROUTER_API_KEY e reinicie o servidor.'
+        : '';
+      loadingMsg.textContent = `✗ Erro: ${errText}${setupHint}`;
       loadingMsg.className = 'msg ai';
       loadingOverlay.classList.remove('active');
       statusBar.textContent = 'erro';
@@ -373,6 +422,8 @@
   chatInput.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   });
+
+  checkServerSetup();
 </script>
 </body>
 </html>

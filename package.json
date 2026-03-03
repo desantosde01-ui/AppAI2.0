@@ -4,7 +4,7 @@
   "description": "Editor de código com IA integrada",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node scripts/bootstrap.js",
     "dev": "nodemon server.js"
   },
   "dependencies": {

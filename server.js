@@ -15,6 +15,23 @@ app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+
+function getSetupIssues() {
+  const issues = [];
+  if (!OPENROUTER_API_KEY) {
+    issues.push('OPENROUTER_API_KEY ausente');
+  }
+  return issues;
+}
+
+function toFriendlySetupMessage(errorMessage) {
+  if ((errorMessage || '').includes('Missing OPENROUTER_API_KEY')) {
+    return 'OPENROUTER_API_KEY não configurada. Crie uma chave no OpenRouter e inicie o servidor com a variável de ambiente OPENROUTER_API_KEY definida.';
+  }
+  return errorMessage;
+}
+
+
 const FONT_PAIRS = {
   barbershop: { heading: 'Bebas Neue', body: 'Inter', url: 'Bebas+Neue|Inter:wght@400;500;600' },
   restaurant: { heading: 'Cormorant Garamond', body: 'Nunito', url: 'Cormorant+Garamond:wght@600;700|Nunito:wght@400;600' },
@@ -425,8 +442,8 @@ function buildPrompt(userRequest, currentAppCode, images) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Routes
 // ─────────────────────────────────────────────────────────────────────────────
-app.post('/api/generate', async (req, res) => {
-  const { prompt, currentAppCode } = req.body;
+async function handleGenerate(req, res, payload) {
+  const { prompt, currentAppCode } = payload;
   if (!prompt) return res.status(400).json({ error: 'Prompt required' });
 
   try {
@@ -447,8 +464,27 @@ app.post('/api/generate', async (req, res) => {
     res.json({ files, appCode, images });
   } catch (err) {
     console.error('/api/generate error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: toFriendlySetupMessage(err.message) });
   }
+}
+
+app.post('/api/generate', async (req, res) => {
+  return handleGenerate(req, res, req.body || {});
+});
+
+// Compat mode: some platforms/proxies may reject POST with 405.
+// Allow GET with query params so the client can retry and avoid blocking the user.
+app.get('/api/generate', async (req, res) => {
+  return handleGenerate(req, res, {
+    prompt: req.query.prompt,
+    currentAppCode: req.query.currentAppCode,
+  });
+});
+
+
+app.get('/api/health', (req, res) => {
+  const issues = getSetupIssues();
+  res.json({ ok: issues.length === 0, issues });
 });
 
 // Recriar UI a partir de imagem (GPT-4o Vision via OpenRouter)
@@ -481,7 +517,7 @@ app.post('/api/image', async (req, res) => {
     res.json({ files, appCode });
   } catch (err) {
     console.error('/api/image error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: toFriendlySetupMessage(err.message) });
   }
 });
 
@@ -499,10 +535,14 @@ app.post('/api/chat', async (req, res) => {
     res.json({ result: (result || '').replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim() });
   } catch (err) {
     console.error('/api/chat error:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: toFriendlySetupMessage(err.message) });
   }
 });
 
 app.listen(PORT, function () {
+  const issues = getSetupIssues();
   console.log('CodeAI running on port ' + PORT);
+  if (issues.length > 0) {
+    console.warn('Setup pendente:', issues.join(', '));
+  }
 });
