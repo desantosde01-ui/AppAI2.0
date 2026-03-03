@@ -337,6 +337,28 @@
     return data;
   }
 
+
+  async function requestWithFallback(pathOptions, fetchOptions) {
+    let lastError = null;
+
+    for (const path of pathOptions) {
+      try {
+        const response = await fetch(path, fetchOptions);
+
+        if (response.status === 404 || response.status === 405) {
+          lastError = new Error(`HTTP ${response.status} em ${path}`);
+          continue;
+        }
+
+        return await parseApiResponse(response);
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    throw lastError || new Error('Falha ao conectar com a API.');
+  }
+
   // SEND MESSAGE
   async function sendMessage() {
     const userMsg = chatInput.value.trim();
@@ -368,16 +390,15 @@
         const imageData = { ...currentImage };
         clearImage();
         const prompt = userMsg || 'Analyze this design and recreate as a React project with Tailwind.';
-        const response = await fetch('/api/image', {
+        const data = await requestWithFallback(['/api/image', '/api/image/'], {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: imageData.base64, mediaType: imageData.mediaType, prompt })
         });
-        const data = await parseApiResponse(response);
         files = data.files;
         currentAppCode = data.appCode; // save App.tsx separately
       } else {
-        const response = await fetch('/api/generate', {
+        const data = await requestWithFallback(['/api/generate', '/api/generate/'], {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -386,7 +407,6 @@
             chatHistory: chatHistory.slice(-10) // send last 10 messages for context
           })
         });
-        const data = await parseApiResponse(response);
         files = data.files;
         currentAppCode = data.appCode; // save App.tsx separately
       }

@@ -442,8 +442,7 @@ function buildPrompt(userRequest, currentAppCode, images) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Routes
 // ─────────────────────────────────────────────────────────────────────────────
-app.post('/api/generate', async (req, res) => {
-  const { prompt, currentAppCode } = req.body;
+async function handleGenerate(req, res, prompt, currentAppCode) {
   if (!prompt) return res.status(400).json({ error: 'Prompt required' });
 
   try {
@@ -466,6 +465,18 @@ app.post('/api/generate', async (req, res) => {
     console.error('/api/generate error:', err.message);
     res.status(500).json({ error: toFriendlySetupMessage(err.message) });
   }
+}
+
+app.post('/api/generate', async (req, res) => {
+  const { prompt, currentAppCode } = req.body || {};
+  await handleGenerate(req, res, prompt, currentAppCode);
+});
+
+// Fallback para ambientes/proxies que chamam GET por engano
+app.get('/api/generate', async (req, res) => {
+  const prompt = req.query.prompt;
+  const currentAppCode = req.query.currentAppCode;
+  await handleGenerate(req, res, prompt, currentAppCode);
 });
 
 
